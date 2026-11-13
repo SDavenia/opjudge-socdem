@@ -1,0 +1,10 @@
+pandas>=2.2
+tqdm==4.68.3
+# local judges
+torch==2.12.1
+transformers==5.12.1
+accelerate==1.14.0
+sentencepiece==0.2.1
+# OpenRouter judges
+openai==3.10.0
+python-dotenv==1.2.2
