@@ -24,6 +24,7 @@ Usage:
     python score.py --setup reference --variable gender --judge_model_id gemma3
     python score.py --setup reference --variable gender --judge_model_id gemma3 --num_situations 10
     python score.py --setup none --judge_model_id openai/gpt-5.4-nano
+    python score.py --setup reference --variable gender --judge_model_id llama-3.2-1b --backend transformers
 """
 import argparse
 import re
@@ -66,7 +67,15 @@ def parse_args():
     parser.add_argument("--max_new_tokens", type=int, default=5)
     parser.add_argument("--save_every", type=int, default=1000,
                         help="Save the partial _by_prompt file every N answers (0: only at the end).")
-    parser.add_argument("--batch_size", type=int, default=32, help="Local judges: divided by batch_size_divide.")
+    parser.add_argument("--backend", choices=["vllm", "transformers"], default="vllm", help="Local judges.")
+    parser.add_argument("--tensor_parallel_size", type=int, default=None, help="vLLM (default: 1).")
+    parser.add_argument("--pipeline_parallel_size", type=int, default=None,
+                        help="vLLM (default: the visible GPUs / tensor_parallel_size).")
+    parser.add_argument("--max_model_len", type=int, default=4096,
+                        help="vLLM: context length the KV cache is sized for (prompts are under 1k tokens).")
+    parser.add_argument("--gpu_memory_utilization", type=float, default=0.9, help="vLLM.")
+    parser.add_argument("--batch_size", type=int, default=32,
+                        help="transformers: divided by batch_size_divide.")
     parser.add_argument("--max_concurrency", type=int, default=8, help="OpenRouter judges: requests in flight.")
     parser.add_argument("--max_retries", type=int, default=5, help="OpenRouter judges.")
     args = parser.parse_args()
@@ -164,8 +173,12 @@ def main():
             scored_by_prompt(rows, answers, meta).to_csv(by_prompt_path, index=False)
             last_saved = n_done
 
-    answers = run_judge(args.judge_model_id, prompts, max_new_tokens=args.max_new_tokens, batch_size=args.batch_size,
-                        group_size=group_size, max_concurrency=args.max_concurrency, max_retries=args.max_retries,
+    answers = run_judge(args.judge_model_id, prompts, max_new_tokens=args.max_new_tokens, group_size=group_size,
+                        backend=args.backend, batch_size=args.batch_size,
+                        tensor_parallel_size=args.tensor_parallel_size,
+                        pipeline_parallel_size=args.pipeline_parallel_size, max_model_len=args.max_model_len,
+                        gpu_memory_utilization=args.gpu_memory_utilization,
+                        max_concurrency=args.max_concurrency, max_retries=args.max_retries,
                         on_progress=checkpoint)
 
     by_prompt = scored_by_prompt(rows, answers, meta)

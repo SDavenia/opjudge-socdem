@@ -1,7 +1,8 @@
 """
-LLM judges, as in opinion_judge_stability_bias: local models run with transformers (REGISTRY)
-and models served by OpenRouter (any other id, an OpenRouter slug such as openai/gpt-5.4-nano,
-with OPENROUTER_API_KEY in the environment or a .env file). Both decode greedily (temperature 0).
+LLM judges, as in opinion_judge_stability_bias: local models (REGISTRY), run with vLLM (default)
+or transformers, and models served by OpenRouter (any other id, an OpenRouter slug such as
+openai/gpt-5.4-nano, with OPENROUTER_API_KEY in the environment or a .env file). All decode
+greedily (temperature 0).
 
 run_judge(judge_model_id, prompts, ...) returns one answer per prompt, in order, and calls
 on_progress(answers, n_done) as answers come in (pending ones are None).
@@ -22,7 +23,7 @@ class ModelSpec:
     proc_class: str = "AutoTokenizer"
     is_vlm: bool = False
     slow_tokenizer: bool = False
-    batch_size_divide: int = 1
+    batch_size_divide: int = 1  # transformers
     num_params: float | None = None
 
 
@@ -48,13 +49,75 @@ def is_local(judge_model_id):
     return judge_model_id in REGISTRY
 
 
-def run_judge(judge_model_id, prompts, *, max_new_tokens, batch_size, group_size, max_concurrency, max_retries,
-              on_progress=None):
+def run_judge(judge_model_id, prompts, *, max_new_tokens, group_size, backend="vllm", batch_size=32,
+              tensor_parallel_size=None, pipeline_parallel_size=None, max_model_len=4096, gpu_memory_utilization=0.9,
+              chunk_size=4096, max_concurrency=8, max_retries=5, on_progress=None):
     if is_local(judge_model_id):
-        return run_local(REGISTRY[judge_model_id], prompts, max_new_tokens=max_new_tokens, batch_size=batch_size,
+        spec = REGISTRY[judge_model_id]
+        if backend == "vllm":
+            return run_vllm(spec, prompts, max_new_tokens=max_new_tokens, group_size=group_size,
+                            tensor_parallel_size=tensor_parallel_size, pipeline_parallel_size=pipeline_parallel_size,
+                            max_model_len=max_model_len,
+                            gpu_memory_utilization=gpu_memory_utilization, chunk_size=chunk_size,
+                            on_progress=on_progress)
+        return run_local(spec, prompts, max_new_tokens=max_new_tokens, batch_size=batch_size,
                          group_size=group_size, on_progress=on_progress)
     return run_openrouter(judge_model_id, prompts, max_new_tokens=max_new_tokens, max_concurrency=max_concurrency,
                           max_retries=max_retries, on_progress=on_progress)
+
+
+# --- Local judges (vLLM) -----------------------------------------------------------------------
+
+def run_vllm(spec, prompts, *, max_new_tokens, group_size=1, tensor_parallel_size=None, pipeline_parallel_size=None,
+             max_model_len=4096, gpu_memory_utilization=0.9, chunk_size=4096, on_progress=None):
+    """Greedy answers to prompts, with the model's chat template. vLLM batches continuously, so
+    the prompts are sent in chunks (a multiple of group_size, so that the versions of a pair go
+    in the same chunk) only to report progress and checkpoint between them.
+
+    The model is split over the GPUs by pipeline rather than tensor parallelism by default: the
+    cluster's GPUs have no P2P link, so the per-layer all-reduces of tensor parallelism go through
+    host memory and are slow."""
+    import torch
+
+    # FlashInfer's sampler is JIT-compiled with the system nvcc, which on the cluster (12.5) is too old
+    # for it; greedy decoding does not need it.
+    os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")
+    from vllm import LLM, SamplingParams
+
+    tp = tensor_parallel_size or 1
+    pp = pipeline_parallel_size or max(1, torch.cuda.device_count() // tp)
+    kwargs = {}
+    if spec.slow_tokenizer:
+        kwargs["tokenizer_mode"] = "slow"
+    if spec.is_vlm:
+        kwargs["limit_mm_per_prompt"] = {"image": 0}  # text only: no memory for the vision encoder
+    llm = LLM(model=spec.name, dtype="bfloat16", tensor_parallel_size=tp, pipeline_parallel_size=pp,
+              max_model_len=max_model_len, gpu_memory_utilization=gpu_memory_utilization, **kwargs)
+    # transformers' generate applies the repetition_penalty of the model's generation_config even with
+    # do_sample=False (Qwen2.5: 1.05 to 1.1, over the prompt tokens too); it is kept, so that the two
+    # backends give the same answers.
+    repetition_penalty = llm.get_default_sampling_params().repetition_penalty
+    params = SamplingParams(temperature=0.0, max_tokens=max_new_tokens, repetition_penalty=repetition_penalty)
+
+    size = max(1, chunk_size)
+    if size >= group_size:
+        size -= size % group_size
+    print(f"Judge {spec.name} (vLLM, tensor parallel {tp}, pipeline parallel {pp}) | {len(prompts)} prompts | "
+          f"chunks of {size} | repetition penalty {repetition_penalty}")
+
+    answers = [None] * len(prompts)
+    with tqdm(total=len(prompts), desc=f"Scoring ({spec.name})") as bar:
+        for start in range(0, len(prompts), size):
+            chunk = prompts[start:start + size]
+            outputs = llm.chat([[{"role": "user", "content": p}] for p in chunk], params, use_tqdm=False)
+            answers[start:start + len(chunk)] = [o.outputs[0].text.strip() for o in outputs]
+            bar.update(len(chunk))
+            if start == 0:
+                for i in range(min(3, len(chunk))):
+                    print(f"[sample {i}] {answers[i]!r}")
+            if on_progress is not None:
+                on_progress(answers, start + len(chunk))
+    return answers
 
 
 # --- Local judges (transformers) ---------------------------------------------------------------
@@ -78,7 +141,7 @@ def load_model(spec):
         proc = getattr(transformers, spec.proc_class).from_pretrained(spec.name, token=token)
 
     model = getattr(transformers, spec.model_class).from_pretrained(
-        spec.name, token=token, torch_dtype=torch.bfloat16, device_map="auto")
+        spec.name, token=token, dtype=torch.bfloat16, device_map="auto")
     model.eval()
 
     tok = tokenizer_of(proc, spec)
@@ -99,9 +162,9 @@ def generate_batch(model, proc, spec, texts, max_new_tokens):
     tok = tokenizer_of(proc, spec)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if spec.is_vlm:
-        inputs = proc(text=texts, return_tensors="pt", padding=True, truncation=True).to(device)
+        inputs = proc(text=texts, return_tensors="pt", padding=True, add_special_tokens=False).to(device)
     else:
-        inputs = tok(texts, return_tensors="pt", padding=True, truncation=True).to(device)
+        inputs = tok(texts, return_tensors="pt", padding=True, add_special_tokens=False).to(device)
     with torch.no_grad():
         output_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, pad_token_id=tok.pad_token_id,
                                     do_sample=False)

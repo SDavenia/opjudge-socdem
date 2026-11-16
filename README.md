@@ -77,7 +77,7 @@ that fit "As ___," (e.g. "someone aged 18-24"), and a pattern of the cues alread
 ## Scoring
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt && pip uninstall -y torchcodec   # see requirements.txt
 cp .env.example .env        # OpenRouter key, only for OpenRouter judges
 
 python score.py --setup reference --variable gender --judge_model_id gemma3
@@ -98,9 +98,17 @@ the candidate the second.
 | `reference` | `hby_reference_{variable}` (all levels) | original | 24,174 | 120,870 |
 
 Other setups (intervened candidates, both sides) are one more entry of `SETUPS` in `score.py`.
-Judges: the local models of `judges.REGISTRY` (transformers, greedy), or any OpenRouter slug.
-With local judges, the versions of a pair that differ only in the sociodemographic level go in
-the same batch, so their scores cannot differ because of the batching.
+Judges: the local models of `judges.REGISTRY`, or any OpenRouter slug. Local judges run with
+vLLM by default (`--backend vllm`), split over all the visible GPUs by pipeline parallelism (the
+GPUs have no P2P link, so the all-reduces of tensor parallelism are slow: Gemma 3 27B is ~8x
+faster with `--pipeline_parallel_size 4` than with `--tensor_parallel_size 4`). Both backends
+decode greedily, with the `repetition_penalty` of the model's `generation_config.json` (only the
+Qwen2.5 models have one), which transformers' `generate` applies even without sampling.
+
+vLLM batches continuously, so the versions of a pair are sent together but their scores can
+still differ by the numerical noise of the batch they end up in (about 3% of the answers change
+between two parallel layouts). `--backend transformers` puts them in the same padded batch, so
+that batching cannot change them, at ~7x the run time.
 
 Output in `scores/{setup}[_{variable}]/`:
 
@@ -111,3 +119,21 @@ Output in `scores/{setup}[_{variable}]/`:
 
 `reference_level` / `candidate_level` is the sociodemographic level of each side (`original` if
 not intervened); `*_original_text_id` links a version back to the HBY opinion.
+
+## Analysis
+
+```bash
+python analyze.py scores/reference_gender      # -> analysis/reference_gender/
+```
+
+For every judge of the directory, how much the score moves when only the prompt variation
+changes (level fixed) vs. when only the level changes (prompt fixed): mean absolute difference
+over the pairs of conditions and share of pairs whose scores differ, for the prompt, the levels
+(female vs male) and the cue (each level vs neutral); and the signed gaps (female - neutral,
+male - neutral, female - male), pooled and by prompt variation. 95% CIs by bootstrap over
+situations. Writes `variation.csv`, `signed_gaps.csv`, `mean_scores.csv` and a plot of each.
+
+By situation (`situations.csv`): every gap and unsigned measure averaged over the situation's
+pairs and prompts, with a standard error clustered by reference opinion. `top_situations.csv` /
+`.png` rank the situations by the female - male gap averaged over the judges (`--top` of them
+plotted), and `situation_agreement.csv` is the Spearman correlation of those gaps between judges.

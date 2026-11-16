@@ -5,3 +5,8 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+env/
+env-vllm/
+commands/
+.env.example
+out/

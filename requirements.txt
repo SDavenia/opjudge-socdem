@@ -1,10 +1,19 @@
+# vLLM 0.31.0 needs torch 2.13.0. The default PyPI wheels of both are built for CUDA 13, which needs
+# a newer driver than the cluster's (555, CUDA 12.5): the CUDA 12.9 builds run on it (minor version
+# compatibility). Then, as the CUDA 13 torchcodec that vLLM pulls in cannot load (and is only
+# used for audio and video inputs), uninstall it:
+#   pip install -r requirements.txt && pip uninstall -y torchcodec
+--extra-index-url https://download.pytorch.org/whl/cu129
 pandas>=2.2
 tqdm==4.68.3
+matplotlib==3.10.9  # analyze.py
 # local judges
-torch==2.12.1
+torch==2.13.0+cu129
+vllm @ https://github.com/vllm-project/vllm/releases/download/v0.31.0/vllm-0.31.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl
 transformers==5.12.1
-accelerate==1.14.0
+accelerate==1.14.0  # transformers backend
 sentencepiece==0.2.1
+pillow==12.3.0  # Gemma 3 is loaded through AutoProcessor, whose image processor needs Pillow
 # OpenRouter judges
 openai==3.10.0
 python-dotenv==1.2.2
