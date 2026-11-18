@@ -19,6 +19,20 @@ computed for three factors:
 Signed gaps, prompt fixed (unit: item x prompt): each level - neutral, and each pair of non-neutral
 levels (female - male), overall and by prompt variation.
 
+--relative: the same measures and plots, as differences relative to a baseline score, per situation.
+For each situation: its mean difference / its mean baseline (e.g. mean female score 0.15 vs mean neutral
+0.10 -> +50%); the pooled value is the unweighted mean of those situation percentages (by prompt
+variation: the same, within that prompt). Not a mean of per-pair ratios, which would divide by the many
+0 scores. Baselines:
+  mad (unsigned)   the mean of the compared scores (prompt: the 5 prompts; levels: female and male;
+                   cue: each level and neutral)
+  signed gaps      the neutral score (or, with no neutral level, the subtracted level's), so that
+                   female - male = (female - neutral) - (male - neutral) holds in relative terms too
+  changed          unchanged (already scale-free)
+Situations with a low baseline get large percentages and weigh as much as any other in the mean.
+The CIs bootstrap the situations; the per-situation SEs are delta-method (linearized) SEs of the ratio.
+Files get a "_relative" suffix, so both versions can sit in the same directory.
+
 95% CIs: bootstrap over situations (the pairs of a situation share its opinions, so they are not
 independent). The sociodemographic variation also contains the numerical noise of vLLM batching
 (about 3% of the answers change between two layouts, see README), which a rerun would estimate.
@@ -36,10 +50,18 @@ Output, in {out_dir} (default analysis/{name of results_dir}/):
                              each judge's gap, how many judges agree on its sign, and the unsigned mad
   situation_agreement.csv    Spearman correlation of the per-situation gaps between judges
   top_situations.png/.pdf    the --top situations of top_situations.csv
+  topics.csv                 judge x grouping (topic domain, subdomain) x topic x measure (each signed gap,
+                             levels/cue mad): mean and CI over the topic's situations, n_situations
+  topic_heterogeneity.csv    judge x grouping x measure: do the topics differ more than random groups of
+                             situations? eta2 (between-topic share of the variance of the situation values),
+                             its value under no topic effect, (G - 1) / (N - 1), and a permutation p-value
+  topics_{domain,subdomain}.png/.pdf  the signed gaps by topic (groups of >= --min_situations situations)
+The topics need the topic columns of topics.py in the scores.
 
 Usage:
     python analyze.py scores/reference_gender
     python analyze.py scores/reference_gender --out_dir analysis/pilot --n_boot 2000
+    python analyze.py scores/reference_gender --relative     # -> *_relative.{csv,png,pdf}
 """
 import argparse
 import textwrap
@@ -77,6 +99,11 @@ def parse_args():
     parser.add_argument("--n_boot", type=int, default=1000, help="Bootstrap resamples of the situations.")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--top", type=int, default=15, help="Situations to print and plot.")
+    parser.add_argument("--n_perm", type=int, default=2000, help="Permutations of the topic heterogeneity test.")
+    parser.add_argument("--min_situations", type=int, default=5,
+                        help="Topic groups with fewer situations are left out of the topic plots (not the CSV).")
+    parser.add_argument("--relative", action="store_true",
+                        help="Differences relative to a baseline score (see above); files get a _relative suffix.")
     return parser.parse_args()
 
 
@@ -142,93 +169,214 @@ def pairwise(wide):
     return pd.DataFrame({"mad": mad, "changed": changed}, index=wide.index)
 
 
-def cluster_bootstrap(values, clusters, n_boot, rng):
-    """Mean of `values` and the 95% CI of a bootstrap that resamples whole clusters."""
-    ok = ~np.isnan(values)
-    values, clusters = values[ok], np.asarray(clusters)[ok]
+def cluster_bootstrap(values, clusters, n_boot, rng, denominators=None):
+    """Mean of `values` and the 95% CI of a bootstrap that resamples whole clusters.
+
+    With `denominators`, a relative mean: each cluster's mean value divided by its mean denominator (e.g.
+    a situation's mean gap / its mean neutral score), then the unweighted mean of those cluster ratios.
+    Clusters whose mean denominator is 0 are dropped."""
+    values = np.asarray(values, dtype=float)
+    relative = denominators is not None
+    denominators = np.asarray(denominators, dtype=float) if relative else np.ones_like(values)
+    ok = ~np.isnan(values) & ~np.isnan(denominators)
+    values, denominators, clusters = values[ok], denominators[ok], np.asarray(clusters)[ok]
     if len(values) == 0:
         return np.nan, np.nan, np.nan, 0
     codes, uniques = pd.factorize(clusters)
-    sums = np.bincount(codes, weights=values)
-    counts = np.bincount(codes).astype(float)
-    weights = rng.multinomial(len(uniques), np.full(len(uniques), 1 / len(uniques)), size=n_boot)
-    boot = (weights @ sums) / (weights @ counts)
+    sums = np.bincount(codes, weights=values, minlength=len(uniques))
+    den_sums = np.bincount(codes, weights=denominators, minlength=len(uniques))
+    if relative:
+        ratios = sums[den_sums != 0] / den_sums[den_sums != 0]
+        weights = rng.multinomial(len(ratios), np.full(len(ratios), 1 / len(ratios)), size=n_boot)
+        boot = weights @ ratios / len(ratios)
+        mean = ratios.mean()
+    else:
+        weights = rng.multinomial(len(uniques), np.full(len(uniques), 1 / len(uniques)), size=n_boot)
+        boot = (weights @ sums) / (weights @ den_sums)
+        mean = values.mean()
     lo, hi = np.percentile(boot, [2.5, 97.5])
-    return values.mean(), lo, hi, len(values)
+    return mean, lo, hi, len(values)
 
 
-def summarize(values, clusters, n_boot, rng, **keys):
-    mean, lo, hi, n = cluster_bootstrap(np.asarray(values, dtype=float), clusters, n_boot, rng)
+def summarize(values, clusters, n_boot, rng, denominators=None, **keys):
+    mean, lo, hi, n = cluster_bootstrap(values, clusters, n_boot, rng, denominators)
     return {**keys, "mean": mean, "ci_low": lo, "ci_high": hi, "n": n}
 
 
-def analyze_judge(df, variable, n_boot, rng):
+def analyze_judge(df, variable, n_boot, rng, relative=False):
     judge = df["judge"].iloc[0]
     variation, gaps = [], []
 
-    # Prompt: across the prompt variations, level fixed.
+    # Prompt: across the prompt variations, level fixed. Relative: to the mean over the prompts.
     by_prompt = df.pivot_table(index=["situation_id", "item", "level"], columns="prompt_variation",
                                values="score", aggfunc="first")
     prompt = pairwise(by_prompt)
     situations = prompt.index.get_level_values("situation_id")
     for metric in ("mad", "changed"):
-        variation.append(summarize(prompt[metric], situations, n_boot, rng,
+        base = by_prompt.mean(axis=1) if relative and metric == "mad" else None
+        variation.append(summarize(prompt[metric], situations, n_boot, rng, base,
                                    judge=judge, factor="prompt", metric=metric))
 
     levels = ordered_levels(df["level"].unique(), variable)
     if df["level"].nunique() < 2:
         return variation, gaps, None
 
-    by_level = df.pivot_table(index=["situation_id", "reference_original_text_id", "item", "prompt_variation"],
-                              columns="level", values="score", aggfunc="first")
+    by_level = level_table(df)
     situations = by_level.index.get_level_values("situation_id")
     prompts = by_level.index.get_level_values("prompt_variation")
 
-    # Per observation (item x prompt), for the per-situation table: the signed gaps and the unsigned measures.
-    observed = {}
+    signed, unsigned = level_measures(by_level, levels, relative)
 
-    # Levels: across the non-neutral levels (female vs male), prompt fixed.
-    if len(levels) >= 2:
-        between = pairwise(by_level[levels])
-        for metric in ("mad", "changed"):
-            variation.append(summarize(between[metric], situations, n_boot, rng,
-                                       judge=judge, factor="levels", metric=metric))
-            observed[f"levels {metric}"] = between[metric]
-
-    # Cue: each non-neutral level vs neutral, averaged over the levels.
-    has_neutral = NEUTRAL_LEVEL in by_level.columns
-    if has_neutral and levels:
-        diffs = by_level[levels].sub(by_level[NEUTRAL_LEVEL], axis=0)
-        cue = {"mad": diffs.abs().mean(axis=1), "changed": (diffs != 0).where(diffs.notna()).mean(axis=1)}
-        for metric, values in cue.items():
-            variation.append(summarize(values, situations, n_boot, rng,
-                                       judge=judge, factor="cue", metric=metric))
-            observed[f"cue {metric}"] = values
+    # Unsigned: levels (female vs male) and cue (each level vs neutral), prompt fixed.
+    for name, (values, base) in unsigned.items():
+        factor, metric = name.split(" ")
+        variation.append(summarize(values, situations, n_boot, rng, base, judge=judge, factor=factor, metric=metric))
 
     # Signed gaps, pooled and by prompt variation.
-    contrasts = {}
-    if has_neutral:
-        contrasts.update({f"{lv} - {NEUTRAL_LEVEL}": by_level[lv] - by_level[NEUTRAL_LEVEL] for lv in levels})
-    contrasts.update({f"{a} - {b}": by_level[a] - by_level[b] for a, b in combinations(levels, 2)})
-    for name, gap in contrasts.items():
-        gaps.append(summarize(gap, situations, n_boot, rng, judge=judge, contrast=name, prompt_variation="all"))
+    for name, (gap, base) in signed.items():
+        gaps.append(summarize(gap, situations, n_boot, rng, base,
+                              judge=judge, contrast=name, prompt_variation="all"))
         for pv in SCORING_PROMPTS:
             mask = np.asarray(prompts == pv)
             if mask.any():
                 gaps.append(summarize(gap[mask], situations[mask], n_boot, rng,
+                                      None if base is None else base[mask],
                                       judge=judge, contrast=name, prompt_variation=pv))
-    by_situation = per_situation(pd.DataFrame({**contrasts, **observed}), judge)
+    # Gaps first, then the unsigned measures (the order of the per-situation table).
+    measures = {**signed, **unsigned}
+    by_situation = per_situation(pd.DataFrame({m: v for m, (v, _) in measures.items()}), judge,
+                                 {m: b for m, (_, b) in measures.items() if b is not None})
     return variation, gaps, by_situation
 
 
-def per_situation(observed, judge):
+def level_table(df):
+    """Scores with one column per level; a row per observation (situation, reference, item, prompt)."""
+    return df.pivot_table(index=["situation_id", "reference_original_text_id", "item", "prompt_variation"],
+                          columns="level", values="score", aggfunc="first")
+
+
+def level_measures(by_level, levels, relative):
+    """The per-observation measures of the levels, as (signed, unsigned): dicts measure -> (values, baseline),
+    the baseline being None in absolute mode or for `changed` (already scale-free).
+
+    signed    each level - neutral and each pair of levels (female - male); baseline: the neutral score
+              (or, with no neutral level, the subtracted level's)
+    unsigned  "levels mad/changed" across the non-neutral levels, "cue mad/changed" each level vs neutral
+              averaged over the levels; baseline: the mean of the compared scores"""
+    has_neutral = NEUTRAL_LEVEL in by_level.columns
+
+    def denominator(metric, baseline):
+        return baseline if relative and metric != "changed" else None
+
+    signed, unsigned = {}, {}
+    if len(levels) >= 2:
+        between = pairwise(by_level[levels])
+        levels_mean = by_level[levels].mean(axis=1)
+        for metric in ("mad", "changed"):
+            unsigned[f"levels {metric}"] = (between[metric], denominator(metric, levels_mean))
+    if has_neutral and levels:
+        diffs = by_level[levels].sub(by_level[NEUTRAL_LEVEL], axis=0)
+        # Baseline: the mean of the compared scores, averaged over the (level, neutral) pairs.
+        cue_mean = by_level[levels].add(by_level[NEUTRAL_LEVEL], axis=0).div(2).mean(axis=1)
+        unsigned["cue mad"] = (diffs.abs().mean(axis=1), denominator("mad", cue_mean))
+        unsigned["cue changed"] = ((diffs != 0).where(diffs.notna()).mean(axis=1), None)
+
+    contrasts = {f"{lv} - {NEUTRAL_LEVEL}": (lv, NEUTRAL_LEVEL) for lv in levels} if has_neutral else {}
+    contrasts.update({f"{a} - {b}": (a, b) for a, b in combinations(levels, 2)})
+    for name, (a, b) in contrasts.items():
+        base = by_level[NEUTRAL_LEVEL] if has_neutral else by_level[b]
+        signed[name] = (by_level[a] - by_level[b], denominator("gap", base))
+    return signed, unsigned
+
+
+# ---------------------------------------------------------------------------------------------
+# Topics
+
+TOPIC_GROUPINGS = {"domain": "topic_domain", "subdomain": "topic_subdomain"}
+
+
+def situation_values(values, baseline, situations):
+    """Each situation's mean value, or, with a baseline, its mean value / its mean baseline (NaN if 0)."""
+    frame = pd.DataFrame({"value": np.asarray(values, dtype=float), "situation": np.asarray(situations)})
+    frame["base"] = 1.0 if baseline is None else np.asarray(baseline, dtype=float)
+    sums = frame.dropna().groupby("situation")[["value", "base"]].sum()
+    return sums["value"] / sums["base"].replace(0, np.nan)
+
+
+def heterogeneity(per_situation_values, groups, n_perm, rng):
+    """Do the groups (topics) differ more than random groups of the same sizes would? On the situation
+    values: eta2 = between-group sum of squares / total sum of squares, its permutation p-value (shuffling
+    the groups of the situations) and its expected value under no topic effect, (G - 1) / (N - 1)."""
+    ok = per_situation_values.notna().to_numpy()
+    values = per_situation_values.to_numpy()[ok]
+    codes, uniques = pd.factorize(np.asarray(groups)[ok])
+    counts = np.bincount(codes).astype(float)
+    total = ((values - values.mean()) ** 2).sum()
+
+    def between(c):
+        means = np.bincount(c, weights=values, minlength=len(uniques)) / counts
+        return (counts * (means - values.mean()) ** 2).sum()
+
+    observed = between(codes)
+    null = np.array([between(rng.permutation(codes)) for _ in range(n_perm)])
+    return {"eta2": observed / total, "eta2_null": (len(uniques) - 1) / (len(values) - 1),
+            "p_value": (1 + (null >= observed).sum()) / (1 + n_perm),
+            "n_groups": len(uniques), "n_situations": len(values)}
+
+
+def analyze_topics(df, variable, n_boot, n_perm, rng, relative=False):
+    """Every signed gap and unsigned mad by topic domain and subdomain (mean and bootstrap CI over the
+    situations of the group, absolute or relative as in the pooled analysis), and a permutation test of
+    whether they differ between the groups."""
+    judge = df["judge"].iloc[0]
+    levels = ordered_levels(df["level"].unique(), variable)
+    by_level = level_table(df)
+    situations = by_level.index.get_level_values("situation_id")
+    signed, unsigned = level_measures(by_level, levels, relative)
+    measures = {**signed, **{m: v for m, v in unsigned.items() if m.endswith("mad")}}
+    topic_of = df.drop_duplicates("situation_id").set_index("situation_id")
+
+    rows, tests = [], []
+    for grouping, column in TOPIC_GROUPINGS.items():
+        groups = topic_of[column].reindex(situations).to_numpy()
+        situation_group = topic_of[column]
+        for measure, (values, base) in measures.items():
+            values = values.to_numpy()
+            base = None if base is None else base.to_numpy()
+            for group in sorted(pd.unique(groups)):
+                mask = groups == group
+                rows.append({**summarize(values[mask], situations[mask], n_boot, rng,
+                                         None if base is None else base[mask],
+                                         judge=judge, grouping=grouping, topic=group, measure=measure),
+                             "n_situations": pd.unique(situations[mask]).size})
+            per_sit = situation_values(values, base, situations)
+            tests.append({"judge": judge, "grouping": grouping, "measure": measure,
+                          **heterogeneity(per_sit, situation_group.reindex(per_sit.index), n_perm, rng)})
+    return rows, tests
+
+
+def per_situation(observed, judge, baselines=None):
     """Each measure averaged over the observations (item x prompt) of each situation, with its standard
     error clustered by reference opinion (each reference has the same number of candidates and prompts,
-    so the mean of the reference means is the mean of the observations). Long format."""
-    by_reference = observed.groupby(level=["situation_id", "reference_original_text_id"]).mean()
+    so the mean of the reference means is the mean of the observations). Long format.
+
+    With `baselines` (measure -> baseline score of each observation), those measures are relative: the
+    situation's mean divided by its mean baseline, with the delta-method SE of that ratio (the SE of the
+    reference means of the linearized values (x - ratio * baseline) / mean baseline)."""
+    keys = ["situation_id", "reference_original_text_id"]
+    by_reference = observed.groupby(level=keys).mean()
     grouped = by_reference.groupby(level="situation_id")
     mean, n = grouped.mean(), grouped.size()
     se = grouped.std().div(np.sqrt(n), axis=0)
+    situation_of = by_reference.index.get_level_values("situation_id")
+    for measure, baseline in (baselines or {}).items():
+        base_by_reference = baseline.groupby(level=keys).mean().reindex(by_reference.index)
+        base_mean = base_by_reference.groupby(level="situation_id").mean().replace(0, np.nan)
+        ratio = mean[measure] / base_mean
+        linearized = ((by_reference[measure] - ratio.reindex(situation_of).to_numpy() * base_by_reference)
+                      / base_mean.reindex(situation_of).to_numpy())
+        mean[measure] = ratio
+        se[measure] = linearized.groupby(level="situation_id").std() / np.sqrt(n)
     out = (mean.stack().rename("mean").to_frame()
            .join(se.stack().rename("se"), how="left")
            .rename_axis(["situation_id", "measure"]).reset_index())
@@ -273,7 +421,12 @@ def setup_axes(ax):
     ax.set_axisbelow(True)
 
 
-def save(fig, out_dir, name):
+def percent_axis(axis):
+    axis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0, decimals=1))
+
+
+def save(fig, out_dir, name, relative=False):
+    name += "_relative" if relative else ""
     for ext in ("png", "pdf"):
         fig.savefig(out_dir / f"{name}.{ext}", dpi=200, bbox_inches="tight", facecolor=SURFACE)
     plt.close(fig)
@@ -292,8 +445,10 @@ def legend(fig, judges, all_judges, y=1.02):
                labelcolor=INK_2, bbox_to_anchor=(0.5, y))
 
 
-def plot_variation(variation, factor_labels, judges, out_dir, title):
-    metrics = [("mad", "Mean absolute score difference"), ("changed", "Share of score pairs that differ")]
+def plot_variation(variation, factor_labels, judges, out_dir, title, relative=False):
+    mad_label = ("Mean absolute score difference,\n% of the mean of the compared scores" if relative
+                 else "Mean absolute score difference")
+    metrics = [("mad", mad_label), ("changed", "Share of score pairs that differ")]
     factors = [f for f in factor_labels if f in set(variation["factor"])]
     fig, axes = figure(ncols=2, figsize=(11, 4.2))
     width = 0.8 / len(judges)
@@ -312,13 +467,20 @@ def plot_variation(variation, factor_labels, judges, out_dir, title):
         ax.set_ylabel(ylabel, fontsize=9, color=INK_2)
         if metric == "changed":
             ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0, decimals=0))
+        elif relative:
+            percent_axis(ax.yaxis)
     legend(fig, judges, judges)
     fig.suptitle(title, fontsize=11, color=INK, y=1.09)
     fig.tight_layout()
-    save(fig, out_dir, "variation")
+    save(fig, out_dir, "variation", relative)
 
 
-def plot_gaps(gaps, judges, out_dir, title):
+def gap_label(relative, baseline, sep=" "):
+    """Axis label of the signed gaps; `baseline` names the score they are relative to."""
+    return f"Mean score difference,{sep}% of the mean {baseline} score" if relative else "Mean score difference"
+
+
+def plot_gaps(gaps, judges, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL):
     pooled = gaps[gaps["prompt_variation"] == "all"]
     contrasts = list(dict.fromkeys(pooled["contrast"]))
     fig, axes = figure(figsize=(7, 0.9 + 0.75 * len(contrasts) * max(1, len(judges) / 3)))
@@ -337,14 +499,16 @@ def plot_gaps(gaps, judges, out_dir, title):
                    zorder=3, label=judge)
     ax.set_yticks(np.arange(len(contrasts)), contrasts, fontsize=9, color=INK)
     ax.invert_yaxis()
-    ax.set_xlabel("Mean score difference (95% CI, bootstrap over situations)", fontsize=9, color=INK_2)
+    ax.set_xlabel(f"{gap_label(relative, baseline)} (95% CI, bootstrap over situations)", fontsize=9, color=INK_2)
+    if relative:
+        percent_axis(ax.xaxis)
     legend(fig, judges, judges)
     fig.suptitle(title, fontsize=11, color=INK, y=1.1)
     fig.tight_layout()
-    save(fig, out_dir, "signed_gaps")
+    save(fig, out_dir, "signed_gaps", relative)
 
 
-def plot_gaps_by_prompt(gaps, judges, out_dir, title):
+def plot_gaps_by_prompt(gaps, judges, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL):
     by_prompt = gaps[gaps["prompt_variation"] != "all"]
     contrasts = list(dict.fromkeys(by_prompt["contrast"]))
     prompts = [p for p in SCORING_PROMPTS if p in set(by_prompt["prompt_variation"])]
@@ -365,14 +529,16 @@ def plot_gaps_by_prompt(gaps, judges, out_dir, title):
                        zorder=3)
         ax.set_xticks(np.arange(len(prompts)), [p.replace("_", "\n") for p in prompts], fontsize=8, color=INK)
         ax.set_title(contrast, fontsize=10, color=INK)
-    axes[0].set_ylabel("Mean score difference (95% CI)", fontsize=9, color=INK_2)
+    axes[0].set_ylabel(f"{gap_label(relative, baseline, sep=chr(10))} (95% CI)", fontsize=9, color=INK_2)
+    if relative:
+        percent_axis(axes[0].yaxis)
     legend(fig, judges, judges)
     fig.suptitle(title, fontsize=11, color=INK, y=1.1)
     fig.tight_layout()
-    save(fig, out_dir, "signed_gaps_by_prompt")
+    save(fig, out_dir, "signed_gaps_by_prompt", relative)
 
 
-def plot_top_situations(top, judges, contrast, n_top, out_dir, title):
+def plot_top_situations(top, judges, contrast, n_top, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL):
     rows = top.head(n_top)
     fig, axes = figure(figsize=(10, 1.0 + 0.55 * len(rows) * max(1, len(judges) / 3)))
     ax = axes[0]
@@ -391,14 +557,62 @@ def plot_top_situations(top, judges, contrast, n_top, out_dir, title):
               for _, r in rows.iterrows()]
     ax.set_yticks(np.arange(len(rows)), labels, fontsize=8, color=INK)
     ax.invert_yaxis()
-    ax.set_xlabel(f"Mean {contrast} score difference in the situation\n(±1.96 SE over its references; "
-                  f"n = references)", fontsize=9, color=INK_2)
+    what = (f"Mean {contrast} score difference in the situation, % of its mean {baseline} score" if relative
+            else f"Mean {contrast} score difference in the situation")
+    ax.set_xlabel(f"{what}\n(±1.96 SE over its references; n = references)", fontsize=9, color=INK_2)
+    if relative:
+        percent_axis(ax.xaxis)
     # Fixed room (in inches) at the top for the title and the legend, whatever the figure's height.
     height = fig.get_figheight()
     fig.suptitle(title, fontsize=11, color=INK, y=1 - 0.15 / height, va="top")
     legend(fig, judges, judges, y=1 - 0.45 / height)
     fig.tight_layout(rect=(0, 0, 1, 1 - 0.8 / height))
-    save(fig, out_dir, "top_situations")
+    save(fig, out_dir, "top_situations", relative)
+
+
+def plot_topics(topics, gaps, judges, grouping, sort_by, min_situations, out_dir, title, relative=False,
+                baseline=NEUTRAL_LEVEL):
+    """One panel per signed contrast, one row per topic group (with at least `min_situations` situations),
+    sorted by the `sort_by` gap averaged over the judges; dotted lines: each judge's pooled gap."""
+    pooled = gaps[gaps["prompt_variation"] == "all"]
+    contrasts = list(dict.fromkeys(pooled["contrast"]))
+    sub = topics[(topics["grouping"] == grouping) & (topics["n_situations"] >= min_situations)]
+    order = (sub[sub["measure"] == sort_by].groupby("topic")["mean"].mean().sort_values(ascending=False).index)
+    if not len(order):
+        return
+    n_sit = sub.groupby("topic")["n_situations"].first()
+    fig, axes = figure(ncols=len(contrasts), sharey=True,
+                       figsize=(3.6 * len(contrasts) + 3.4, 1.4 + 0.36 * len(order) * max(1, len(judges) / 3)))
+    step = 0.6 / max(1, len(judges) - 1) if len(judges) > 1 else 0
+    for ax, contrast in zip(axes, contrasts):
+        setup_axes(ax)
+        ax.grid(axis="y", visible=False)
+        ax.axvline(0, color=INK_MUTED, linewidth=1, zorder=1)
+        for k, judge in enumerate(judges):
+            color, marker = style_of(judge, judges)
+            overall = pooled[(pooled["judge"] == judge) & (pooled["contrast"] == contrast)]["mean"]
+            if len(overall):
+                ax.axvline(overall.iloc[0], color=color, linewidth=1, linestyle=":", zorder=1)
+            rows = sub[(sub["judge"] == judge) & (sub["measure"] == contrast)].set_index("topic").reindex(order)
+            y = np.arange(len(order)) + (k - (len(judges) - 1) / 2) * step
+            ax.errorbar(rows["mean"], y, xerr=[rows["mean"] - rows["ci_low"], rows["ci_high"] - rows["mean"]],
+                        fmt="none", ecolor=color, elinewidth=1.6, capsize=0, zorder=2)
+            ax.scatter(rows["mean"], y, color=color, marker=marker, s=30, edgecolors=SURFACE, linewidths=1.2,
+                       zorder=3)
+        ax.set_title(contrast, fontsize=10, color=INK)
+        ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=4))
+        if relative:
+            percent_axis(ax.xaxis)
+    axes[0].set_yticks(np.arange(len(order)),
+                       [f"{textwrap.shorten(str(t), 48)}  (n={n_sit[t]})" for t in order], fontsize=8, color=INK)
+    axes[0].invert_yaxis()
+    fig.supxlabel(f"{gap_label(relative, baseline)} (95% CI, bootstrap over the topic's situations; "
+                  f"dotted: pooled; n = situations)", fontsize=9, color=INK_2)
+    height = fig.get_figheight()
+    fig.suptitle(title, fontsize=11, color=INK, y=1 - 0.15 / height, va="top")
+    legend(fig, judges, judges, y=1 - 0.45 / height)
+    fig.tight_layout(rect=(0, 0, 1, 1 - 0.6 / height))
+    save(fig, out_dir, f"topics_{grouping}", relative)
 
 
 def load_situation_texts(results_dir):
@@ -425,7 +639,7 @@ def main():
 
     variation, gaps, by_situation = [], [], []
     for judge in judges:
-        v, g, s = analyze_judge(df[df["judge"] == judge], variable, args.n_boot, rng)
+        v, g, s = analyze_judge(df[df["judge"] == judge], variable, args.n_boot, rng, args.relative)
         variation += v
         gaps += g
         if s is not None:
@@ -435,27 +649,37 @@ def main():
                    .reindex(columns=[p for p in SCORING_PROMPTS if p in set(df["prompt_variation"])]))
     mean_scores["all"] = df.groupby(["judge", "level"])["score"].mean()
 
-    variation.to_csv(out_dir / "variation.csv", index=False)
-    gaps.to_csv(out_dir / "signed_gaps.csv", index=False)
+    rel = args.relative
+    suffix = "_relative" if rel else ""
+    # What the signed gaps are relative to (see analyze_judge).
+    baseline = NEUTRAL_LEVEL if NEUTRAL_LEVEL in set(df["level"]) else "subtracted level's"
+    variation.to_csv(out_dir / f"variation{suffix}.csv", index=False)
+    gaps.to_csv(out_dir / f"signed_gaps{suffix}.csv", index=False)
     mean_scores.to_csv(out_dir / "mean_scores.csv")
 
     factor_labels = {"prompt": "Prompt variation\n(5 prompts, level fixed)",
                      "levels": f"{variable or 'Level'}: {' vs '.join(levels)}\n(prompt fixed)",
                      "cue": f"{variable or 'Level'} cue vs {NEUTRAL_LEVEL}\n(prompt fixed)"}
-    title = f"{args.results_dir.name}: {intervened} intervened"
-    plot_variation(variation, factor_labels, judges, out_dir, f"Score variation by factor — {title}")
+    title = f"{args.results_dir.name}: {intervened} intervened" + (" (relative)" if rel else "")
+    plot_variation(variation, factor_labels, judges, out_dir, f"Score variation by factor — {title}", rel)
     if len(gaps):
-        plot_gaps(gaps, judges, out_dir, f"Signed score gaps — {title}")
-        plot_gaps_by_prompt(gaps, judges, out_dir, f"Signed score gaps by prompt variation — {title}")
+        plot_gaps(gaps, judges, out_dir, f"Signed score gaps — {title}", rel, baseline)
+        plot_gaps_by_prompt(gaps, judges, out_dir, f"Signed score gaps by prompt variation — {title}", rel, baseline)
 
     pd.set_option("display.width", 250, "display.max_columns", 20)
-    fmt = lambda r: f"{r['mean']:.4f} [{r['ci_low']:.4f}, {r['ci_high']:.4f}]"  # noqa: E731
+    if rel:  # every value is a ratio or a share: print as percentages
+        fmt = lambda r: f"{r['mean']:.2%} [{r['ci_low']:.2%}, {r['ci_high']:.2%}]"  # noqa: E731
+    else:
+        fmt = lambda r: f"{r['mean']:.4f} [{r['ci_low']:.4f}, {r['ci_high']:.4f}]"  # noqa: E731
+    unit = " (mad relative to the mean of the compared scores)" if rel else ""
     table = variation.assign(value=variation.apply(fmt, axis=1)).pivot(
         index=["judge", "metric"], columns="factor", values="value")
-    print("\nUnsigned variation (mean [95% CI])\n", table.reindex(columns=[f for f in factor_labels if f in table]))
+    print(f"\nUnsigned variation{unit} (mean [95% CI])\n",
+          table.reindex(columns=[f for f in factor_labels if f in table]))
     if len(gaps):
         pooled = gaps[gaps["prompt_variation"] == "all"]
-        print("\nSigned gaps, pooled over prompts (mean [95% CI])\n",
+        print(f"\nSigned gaps, pooled over prompts{f' (relative to the {baseline} score)' if rel else ''} "
+              "(mean [95% CI])\n",
               pooled.assign(value=pooled.apply(fmt, axis=1)).pivot(index="judge", columns="contrast", values="value"))
     print("\nMean score by level\n", mean_scores["all"].unstack().round(4))
 
@@ -464,21 +688,49 @@ def main():
         by_situation = pd.concat(by_situation, ignore_index=True)
         contrast = f"{levels[0]} - {levels[1]}" if len(levels) >= 2 else gaps["contrast"].iloc[0]
         top = top_situations(by_situation, load_situation_texts(args.results_dir), judges, contrast)
-        by_situation.to_csv(out_dir / "situations.csv", index=False)
-        top.to_csv(out_dir / "top_situations.csv", index=False)
+        by_situation.to_csv(out_dir / f"situations{suffix}.csv", index=False)
+        top.to_csv(out_dir / f"top_situations{suffix}.csv", index=False)
         plot_top_situations(top, judges, contrast, args.top, out_dir,
-                            f"Situations with the largest {contrast} gap (mean over judges) — {title}")
+                            f"Situations with the largest {contrast} gap (mean over judges) — {title}", rel, baseline)
 
         gap_by_judge = (by_situation[by_situation["measure"] == contrast]
                         .pivot(index="situation_id", columns="judge", values="mean").reindex(columns=judges))
         agreement = gap_by_judge.corr(method="spearman")
-        agreement.to_csv(out_dir / "situation_agreement.csv")
+        agreement.to_csv(out_dir / f"situation_agreement{suffix}.csv")
         print(f"\nPer-situation {contrast} gap: Spearman correlation between judges\n", agreement.round(3))
         show = ["rank", "gap_mean_over_judges", "n_judges_same_sign"] + [f"gap {j}" for j in judges] + [
             "n_references", "situation"]
         with pd.option_context("display.max_colwidth", 90, "display.float_format", "{:.3f}".format):
             print(f"\nTop {args.top} situations by |{contrast}| (mean over judges)\n",
                   top[show].head(args.top).to_string(index=False))
+
+        # Topics: the same measures by topic domain and subdomain (after the rest, so that adding them
+        # does not change the bootstrap draws of the pooled results).
+        if all(c in df for c in TOPIC_GROUPINGS.values()):
+            topics, tests = [], []
+            for judge in judges:
+                r, t = analyze_topics(df[df["judge"] == judge], variable, args.n_boot, args.n_perm, rng, rel)
+                topics += r
+                tests += t
+            topics, tests = pd.DataFrame(topics), pd.DataFrame(tests)
+            topics.to_csv(out_dir / f"topics{suffix}.csv", index=False)
+            tests.to_csv(out_dir / f"topic_heterogeneity{suffix}.csv", index=False)
+            for grouping in TOPIC_GROUPINGS:
+                plot_topics(topics, gaps, judges, grouping, contrast, args.min_situations, out_dir,
+                            f"Signed score gaps by topic {grouping} — {title}", rel, baseline)
+            print(f"\nDo the topics differ? eta2 of the situation {'percentages' if rel else 'means'} between "
+                  "topic groups vs its value under no topic effect, permutation p-value\n",
+                  tests.assign(eta2=tests["eta2"].round(3), eta2_null=tests["eta2_null"].round(3))
+                  .pivot(index=["grouping", "measure"], columns="judge", values=["eta2", "p_value"])
+                  .to_string())
+            print(f"(eta2 under no topic effect: "
+                  f"{', '.join(f'{g} {v:.3f}' for g, v in tests.groupby('grouping')['eta2_null'].first().items())})")
+            domain = topics[(topics["grouping"] == "domain") & (topics["measure"] == contrast)]
+            print(f"\n{contrast} by topic domain (mean [95% CI])\n",
+                  domain.assign(value=domain.apply(fmt, axis=1))
+                  .pivot(index="topic", columns="judge", values="value").to_string())
+        else:
+            print("\nNo topic columns in the scores: run topics.py to add them.")
     print(f"\nSaved to {out_dir}")
 
 

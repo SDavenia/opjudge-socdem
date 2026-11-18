@@ -1,0 +1,966 @@
+{
+  "domains": [
+    {
+      "name": "Technology and Digital Society",
+      "subdomains": [
+        {
+          "name": "AI, Innovation and Science Policy",
+          "topics": [
+            0,
+            82,
+            100
+          ]
+        },
+        {
+          "name": "Surveillance, Privacy",
+          "topics": [
+            24,
+            56
+          ]
+        },
+        {
+          "name": "Technology Use",
+          "topics": [
+            31
+          ]
+        },
+        {
+          "name": "Digital Platforms and Media",
+          "topics": [
+            17,
+            68
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Environment, Energy and Infrastructure",
+      "subdomains": [
+        {
+          "name": "Environment & Climate",
+          "topics": [
+            23,
+            36,
+            40,
+            77,
+            87
+          ]
+        },
+        {
+          "name": "Energy Policy",
+          "topics": [
+            4,
+            39,
+            73,
+            76
+          ]
+        },
+        {
+          "name": "Transportation and Infrastructure",
+          "topics": [
+            33,
+            59,
+            78,
+            85,
+            99,
+            103
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health, Healthcare & Bioethics",
+      "subdomains": [
+        {
+          "name": "Healthcare Systems",
+          "topics": [
+            22,
+            48,
+            51
+          ]
+        },
+        {
+          "name": "Public Health and Lifestyle Policy",
+          "topics": [
+            29,
+            88
+          ]
+        },
+        {
+          "name": "Bioethics",
+          "topics": [
+            43,
+            61,
+            72,
+            83
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Economy, Labour & Welfare",
+      "subdomains": [
+        {
+          "name": "Taxation & Inequality",
+          "topics": [
+            2,
+            71,
+            96
+          ]
+        },
+        {
+          "name": "Labour & Employment",
+          "topics": [
+            38,
+            58,
+            69
+          ]
+        },
+        {
+          "name": "Welfare & Social Support",
+          "topics": [
+            6,
+            37,
+            79
+          ]
+        },
+        {
+          "name": "Government Spending & Macroeconomics",
+          "topics": [
+            11,
+            15,
+            80,
+            91
+          ]
+        },
+        {
+          "name": "Economic Systems & Trade",
+          "topics": [
+            49,
+            81
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Governance, Politics and Public Administration",
+      "subdomains": [
+        {
+          "name": "General Governance",
+          "topics": [
+            1,
+            19,
+            34,
+            50,
+            90,
+            95,
+            104
+          ]
+        },
+        {
+          "name": "Elections and Democracy",
+          "topics": [
+            8,
+            14,
+            101
+          ]
+        },
+        {
+          "name": "Political Institutions",
+          "topics": [
+            30,
+            92,
+            74
+          ]
+        },
+        {
+          "name": "Criminal Justice & Policing",
+          "topics": [
+            65,
+            89
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Law, Rights and Ethical Frameworks",
+      "subdomains": [
+        {
+          "name": "Rights & Civil Liberties",
+          "topics": [
+            10,
+            53
+          ]
+        },
+        {
+          "name": "Legal Restrictions & Responsibilities",
+          "topics": [
+            47,
+            52,
+            67
+          ]
+        },
+        {
+          "name": "Ethics and Philosophy",
+          "topics": [
+            18,
+            55,
+            57,
+            60,
+            84,
+            86
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Society, Education & Culture",
+      "subdomains": [
+        {
+          "name": "Education & Children",
+          "topics": [
+            3,
+            41,
+            42,
+            66,
+            70,
+            93
+          ]
+        },
+        {
+          "name": "Higher Education",
+          "topics": [
+            16
+          ]
+        },
+        {
+          "name": "Culture & Identity",
+          "topics": [
+            44,
+            64
+          ]
+        },
+        {
+          "name": "National Identity & Constitutional Issues",
+          "topics": [
+            20,
+            26,
+            63
+          ]
+        },
+        {
+          "name": "Arts & Culture Funding",
+          "topics": [
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "name": "International Relations & Migration",
+      "subdomains": [
+        {
+          "name": "Foreign Policy & Aid",
+          "topics": [
+            12
+          ]
+        },
+        {
+          "name": "Immigration & Borders",
+          "topics": [
+            13,
+            98
+          ]
+        },
+        {
+          "name": "Europe & Monetary Policy",
+          "topics": [
+            35,
+            46
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Public Safety, Consumer Protection & Specific Regulations",
+      "subdomains": [
+        {
+          "name": "Consumer Protection & Advertising",
+          "topics": [
+            9,
+            62,
+            97
+          ]
+        },
+        {
+          "name": "Harmful Substance Regulation",
+          "topics": [
+            7,
+            21,
+            25,
+            28,
+            94
+          ]
+        },
+        {
+          "name": "Weapons & Hazardous Items",
+          "topics": [
+            102
+          ]
+        },
+        {
+          "name": "Public Safety",
+          "topics": [
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Animal Welfare",
+      "subdomains": [
+        {
+          "name": "Animal Welfare",
+          "topics": [
+            5,
+            27,
+            54,
+            75
+          ]
+        }
+      ]
+    }
+  ],
+  "topics": {
+    "0": {
+      "label": "Artificial Intelligence & Technology Ethics",
+      "focus": "AI risks, ethics, automation, and societal impact",
+      "subdomain": "AI, Innovation and Science Policy",
+      "domain": "Technology and Digital Society"
+    },
+    "1": {
+      "label": "UK Domestic Policy & Society (General Public Policy)",
+      "focus": "broad UK policy issues—economy, infrastructure, lifestyle, environment",
+      "subdomain": "General Governance",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "2": {
+      "label": "Wealth, Taxation & Inequality",
+      "focus": "distribution of wealth, taxation systems, fairness",
+      "subdomain": "Taxation & Inequality",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "3": {
+      "label": "Children, Education & Youth Policy",
+      "focus": "upbringing, schooling, child welfare, youth rights",
+      "subdomain": "Education & Children",
+      "domain": "Society, Education & Culture"
+    },
+    "4": {
+      "label": "Nuclear Energy & Power Policy",
+      "focus": "nuclear power, energy strategy, environmental trade-offs",
+      "subdomain": "Energy Policy",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "5": {
+      "label": "Animal Ethics & Scientific Testing",
+      "focus": "use of animals in research, ethics of experimentation",
+      "subdomain": "Animal Welfare",
+      "domain": "Animal Welfare"
+    },
+    "6": {
+      "label": "Universal Basic Income (UBI)",
+      "focus": "basic income policies and welfare reform",
+      "subdomain": "Welfare & Social Support",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "7": {
+      "label": "Drug Policy & Substance Regulation",
+      "focus": "legality, decriminalisation, and control of drugs",
+      "subdomain": "Harmful Substance Regulation",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "8": {
+      "label": "Voting Age Reform",
+      "focus": "debates specifically about lowering or raising voting age",
+      "subdomain": "Elections and Democracy",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "9": {
+      "label": "Regulation of Consumer Goods (Alcohol, Sugar, Tobacco, etc.)",
+      "focus": "public health restrictions and consumption laws",
+      "subdomain": "Consumer Protection & Advertising",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "10": {
+      "label": "Free Speech, Censorship & Civil Liberties",
+      "focus": "speech rights, hate speech, misinformation, censorship",
+      "subdomain": "Rights & Civil Liberties",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "11": {
+      "label": "Government Intervention & Economic Policy (Subsidies & Industry)",
+      "focus": "state support, subsidies, economic intervention",
+      "subdomain": "Government Spending & Macroeconomics",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "12": {
+      "label": "Foreign Aid, International Relations & Humanitarian Policy",
+      "focus": "aid, global responsibility, military humanitarian roles",
+      "subdomain": "Foreign Policy & Aid",
+      "domain": "International Relations & Migration"
+    },
+    "13": {
+      "label": "Immigration & Asylum Policy",
+      "focus": "migration, refugees, border control",
+      "subdomain": "Immigration & Borders",
+      "domain": "International Relations & Migration"
+    },
+    "14": {
+      "label": "Voting Systems & Democratic Participation",
+      "focus": "who can vote, compulsory voting, electoral processes",
+      "subdomain": "Elections and Democracy",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "15": {
+      "label": "Public Spending & Budget Priorities",
+      "focus": "allocation of government spending (health, defence, education)",
+      "subdomain": "Government Spending & Macroeconomics",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "16": {
+      "label": "Higher Education Policy & Tuition Fees",
+      "focus": "university access, funding, student debt",
+      "subdomain": "Higher Education",
+      "domain": "Society, Education & Culture"
+    },
+    "17": {
+      "label": "BBC & Public Broadcasting Policy",
+      "focus": "role, funding, and structure of the BBC",
+      "subdomain": "Digital Platforms and Media",
+      "domain": "Technology and Digital Society"
+    },
+    "18": {
+      "label": "Legal & Moral Issues (Law, Rights, Social Norms)",
+      "focus": "legality of behaviors, moral/legal boundaries",
+      "subdomain": "Ethics and Philosophy",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "19": {
+      "label": "Public Services & Digital/Physical Infrastructure Access",
+      "focus": "access to services (internet, transport, accessibility, public goods)",
+      "subdomain": "General Governance",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "20": {
+      "label": "National Identity, Constitutional Reform & Foreign Policy (General)",
+      "focus": "structure of the state, sovereignty, international relations, national identity",
+      "subdomain": "National Identity & Constitutional Issues",
+      "domain": "Society, Education & Culture"
+    },
+    "21": {
+      "label": "Sin Taxes & Pricing Policies (Alcohol, Tobacco, Sugar)",
+      "focus": "taxation and minimum pricing to influence unhealthy consumption",
+      "subdomain": "Harmful Substance Regulation",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "22": {
+      "label": "Healthcare System & NHS Policy",
+      "focus": "public vs private healthcare, funding, access, and structure of the health system",
+      "subdomain": "Healthcare Systems",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "23": {
+      "label": "Climate Change Policy & Carbon Taxation",
+      "focus": "emissions reduction, carbon pricing, environmental targets",
+      "subdomain": "Environment & Climate",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "24": {
+      "label": "National Identity Cards & Surveillance",
+      "focus": "ID systems, biometric data, population databases, state monitoring",
+      "subdomain": "Surveillance, Privacy",
+      "domain": "Technology and Digital Society"
+    },
+    "25": {
+      "label": "Cannabis Policy",
+      "focus": "legalisation, decriminalisation, medical vs recreational use",
+      "subdomain": "Harmful Substance Regulation",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "26": {
+      "label": "Monarchy vs Republic",
+      "focus": "role, relevance, and future of the monarchy",
+      "subdomain": "National Identity & Constitutional Issues",
+      "domain": "Society, Education & Culture"
+    },
+    "27": {
+      "label": "Food Ethics, Diet & Animal Consumption",
+      "focus": "veganism, meat consumption, ethics of eating animals, sustainability",
+      "subdomain": "Animal Welfare",
+      "domain": "Animal Welfare"
+    },
+    "28": {
+      "label": "Tobacco Regulation & Smoking Bans",
+      "focus": "banning or restricting cigarettes and tobacco products",
+      "subdomain": "Harmful Substance Regulation",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "29": {
+      "label": "Food Policy, Nutrition & Public Health (Obesity)",
+      "focus": "diet regulation, obesity, food industry rules, public health interventions",
+      "subdomain": "Public Health and Lifestyle Policy",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "30": {
+      "label": "Political System Reform & Executive Power",
+      "focus": "limits on political leaders, term limits, structure of leadership",
+      "subdomain": "Political Institutions",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "31": {
+      "label": "Technology Use & Public Behaviour (Mobile Phones)",
+      "focus": "rules around device usage in public spaces, schools, and transport",
+      "subdomain": "Technology Use",
+      "domain": "Technology and Digital Society"
+    },
+    "32": {
+      "label": "Fireworks Regulation",
+      "focus": "legality and restriction of fireworks",
+      "subdomain": "Public Safety",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "33": {
+      "label": "Transport & Environmental Policy (Fossil Fuel Vehicles)",
+      "focus": "banning petrol/diesel cars, transition to electric vehicles",
+      "subdomain": "Transportation and Infrastructure",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "34": {
+      "label": "Role of Government & Public Services (General Governance)",
+      "focus": "state powers, public ownership, welfare, transparency, civil obligations",
+      "subdomain": "General Governance",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "35": {
+      "label": "Currency & Monetary Policy (Euro vs Pound)",
+      "focus": "national currency decisions and monetary sovereignty",
+      "subdomain": "Europe & Monetary Policy",
+      "domain": "International Relations & Migration"
+    },
+    "36": {
+      "label": "Climate Change Awareness & Urgency",
+      "focus": "perception of climate crisis, urgency, and adequacy of current action",
+      "subdomain": "Environment & Climate",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "37": {
+      "label": "Housing Policy & Affordability",
+      "focus": "housing supply, pricing, rent control, home ownership",
+      "subdomain": "Welfare & Social Support",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "38": {
+      "label": "Minimum Wage & Wage Regulation",
+      "focus": "wage floors, living wage, income limits",
+      "subdomain": "Labour & Employment",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "39": {
+      "label": "Energy Policy (Renewables vs Fossil Fuels)",
+      "focus": "energy transition, investment, sustainability strategies",
+      "subdomain": "Energy Policy",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "40": {
+      "label": "Plastic Use & Environmental Waste Policy",
+      "focus": "banning/reducing plastics and environmental impact of waste",
+      "subdomain": "Environment & Climate",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "41": {
+      "label": "Child Welfare, Childcare & Family Support",
+      "focus": "childcare, school meals, early education, family subsidies",
+      "subdomain": "Education & Children",
+      "domain": "Society, Education & Culture"
+    },
+    "42": {
+      "label": "Education Curriculum & Content",
+      "focus": "what is taught in schools (religion, sex education, critical thinking)",
+      "subdomain": "Education & Children",
+      "domain": "Society, Education & Culture"
+    },
+    "43": {
+      "label": "Genetic Engineering, GMOs & Bioethics",
+      "focus": "gene editing, GM foods, pesticides, biotechnology ethics",
+      "subdomain": "Bioethics",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "44": {
+      "label": "History, Culture & Collective Memory",
+      "focus": "statues, historical figures, national history, cultural identity debates",
+      "subdomain": "Culture & Identity",
+      "domain": "Society, Education & Culture"
+    },
+    "45": {
+      "label": "Arts Funding & Cultural Policy",
+      "focus": "public funding and support for arts and culture",
+      "subdomain": "Arts & Culture Funding",
+      "domain": "Society, Education & Culture"
+    },
+    "46": {
+      "label": "European Union & Brexit Policy",
+      "focus": "EU membership, Brexit consequences, UK–EU relations",
+      "subdomain": "Europe & Monetary Policy",
+      "domain": "International Relations & Migration"
+    },
+    "47": {
+      "label": "Regulation, Bans & Personal Freedom (General Restrictions)",
+      "focus": "broad “should we ban X?” questions across multiple domains",
+      "subdomain": "Legal Restrictions & Responsibilities",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "48": {
+      "label": "Taxation & Public Spending (NHS-focused)",
+      "focus": "how to fund public services, especially healthcare",
+      "subdomain": "Healthcare Systems",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "49": {
+      "label": "Political & Economic Systems (Ideologies)",
+      "focus": "capitalism vs socialism, democracy, governance models",
+      "subdomain": "Economic Systems & Trade",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "50": {
+      "label": "Pensions, Ageing & National Service",
+      "focus": "retirement age, pensions, elderly welfare, and mandatory service (military/community)",
+      "subdomain": "General Governance",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "51": {
+      "label": "NHS Performance & Healthcare System Evaluation",
+      "focus": "effectiveness, efficiency, and overall quality of the healthcare system",
+      "subdomain": "Healthcare Systems",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "52": {
+      "label": "Limits, Caps & Personal Restrictions (General)",
+      "focus": "imposing limits on income, behaviour, consumption, and freedoms",
+      "subdomain": "Legal Restrictions & Responsibilities",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "53": {
+      "label": "Individual Rights, Liberties & Social Entitlements",
+      "focus": "personal freedoms, legal rights, moral entitlements, and equality",
+      "subdomain": "Rights & Civil Liberties",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "54": {
+      "label": "Animal Welfare & Protection Policy",
+      "focus": "bans on animal products, anti-cruelty laws, conservation",
+      "subdomain": "Animal Welfare",
+      "domain": "Animal Welfare"
+    },
+    "55": {
+      "label": "General Philosophical & Societal Questions",
+      "focus": "broad, mixed, often abstract or speculative societal/technological questions",
+      "subdomain": "Ethics and Philosophy",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "56": {
+      "label": "Surveillance, Privacy & Security Technology",
+      "focus": "facial recognition, CCTV, data tracking, policing technologies",
+      "subdomain": "Surveillance, Privacy",
+      "domain": "Technology and Digital Society"
+    },
+    "57": {
+      "label": "Moral Responsibility & Ethics (General)",
+      "focus": "moral duties (charity, refugees, global responsibility, religion)",
+      "subdomain": "Ethics and Philosophy",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "58": {
+      "label": "Work, Labour Policy & Work-Life Balance",
+      "focus": "working hours, flexible work, productivity, labour conditions",
+      "subdomain": "Labour & Employment",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "59": {
+      "label": "Public Transport Policy & Accessibility",
+      "focus": "cost, funding, and availability of public transportation",
+      "subdomain": "Transportation and Infrastructure",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "60": {
+      "label": "Everyday Ethics & Social Behaviour",
+      "focus": "informal moral dilemmas and day-to-day ethical judgments",
+      "subdomain": "Ethics and Philosophy",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "61": {
+      "label": "Family, Parenting & Reproductive Ethics",
+      "focus": "parenting rights, childcare, reproductive technologies, family policy",
+      "subdomain": "Bioethics",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "62": {
+      "label": "Public Health, Safety & Personal Regulation",
+      "focus": "masks, helmets, clothing rules, safety laws",
+      "subdomain": "Consumer Protection & Advertising",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "63": {
+      "label": "Devolution, Independence & UK Constitutional Structure",
+      "focus": "Scotland, Northern Ireland, regional autonomy, UK unity",
+      "subdomain": "National Identity & Constitutional Issues",
+      "domain": "Society, Education & Culture"
+    },
+    "64": {
+      "label": "General UK Society, Culture & Opinion Questions",
+      "focus": "broad evaluative questions about UK society, culture, politics",
+      "subdomain": "Culture & Identity",
+      "domain": "Society, Education & Culture"
+    },
+    "65": {
+      "label": "Criminal Justice System & Punishment",
+      "focus": "prisons, sentencing, policing, justice policy",
+      "subdomain": "Criminal Justice & Policing",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "66": {
+      "label": "Parenting, Education Rights & Child Welfare",
+      "focus": "school choice, homeschooling, parental authority, attendance",
+      "subdomain": "Education & Children",
+      "domain": "Society, Education & Culture"
+    },
+    "67": {
+      "label": "Age Restrictions & Legal Responsibility",
+      "focus": "drinking age, smoking age, adulthood, legal thresholds",
+      "subdomain": "Legal Restrictions & Responsibilities",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "68": {
+      "label": "Media, Social Media & Big Tech Regulation",
+      "focus": "data privacy, misinformation, platform control",
+      "subdomain": "Digital Platforms and Media",
+      "domain": "Technology and Digital Society"
+    },
+    "69": {
+      "label": "Employment Law & Workers' Rights",
+      "focus": "pay, conditions, corporate responsibility, flexibility",
+      "subdomain": "Labour & Employment",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "70": {
+      "label": "Education System & School Policy",
+      "focus": "private vs public schools, uniforms, funding, structure",
+      "subdomain": "Education & Children",
+      "domain": "Society, Education & Culture"
+    },
+    "71": {
+      "label": "Taxation & Economic Policy",
+      "focus": "tax rates, inequality, redistribution",
+      "subdomain": "Taxation & Inequality",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "72": {
+      "label": "Drugs, Medicine & Bioethics",
+      "focus": "drug legality, prescriptions, experimental treatments",
+      "subdomain": "Bioethics",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "73": {
+      "label": "Energy Policy & Fracking",
+      "focus": "fossil fuels, shale gas, environmental trade-offs",
+      "subdomain": "Energy Policy",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "74": {
+      "label": "Politics, Elections & Political Ethics",
+      "focus": "campaign finance, transparency, political conduct",
+      "subdomain": "Political Institutions",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "75": {
+      "label": "Animal Rights & Human-Animal Relationships",
+      "focus": "pets, zoos, hunting, ethics of animal use",
+      "subdomain": "Animal Welfare",
+      "domain": "Animal Welfare"
+    },
+    "76": {
+      "label": "Renewable Energy & Solar Policy",
+      "focus": "solar power adoption, subsidies, mandates",
+      "subdomain": "Energy Policy",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "77": {
+      "label": "Environment & Government Responsibility",
+      "focus": "pollution, conservation, public policy responsibility",
+      "subdomain": "Environment & Climate",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "78": {
+      "label": "Infrastructure & Transport Development",
+      "focus": "railways, roads, megaprojects, national investment",
+      "subdomain": "Transportation and Infrastructure",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "79": {
+      "label": "Poverty, Welfare & Social Support",
+      "focus": "homelessness, inequality, government assistance",
+      "subdomain": "Welfare & Social Support",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "80": {
+      "label": "Government Spending & Subsidies",
+      "focus": "public funding, arts, regional inequality, subsidies, state support",
+      "subdomain": "Government Spending & Macroeconomics",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "81": {
+      "label": "Trade, Globalisation & Ethical Consumption",
+      "focus": "imports/exports, tariffs, foreign investment, ethical sourcing",
+      "subdomain": "Economic Systems & Trade",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "82": {
+      "label": "Science, Research & Innovation Policy",
+      "focus": "research funding, space, cloning, scientific priorities",
+      "subdomain": "AI, Innovation and Science Policy",
+      "domain": "Technology and Digital Society"
+    },
+    "83": {
+      "label": "Bioethics & Organ Donation",
+      "focus": "organ markets, donation systems, medical ethics",
+      "subdomain": "Bioethics",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "84": {
+      "label": "Big Questions (Philosophy, Future & Humanity)",
+      "focus": "population, future of humanity, existential questions",
+      "subdomain": "Ethics and Philosophy",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "85": {
+      "label": "Transport Infrastructure (Airports & Aviation)",
+      "focus": "runways, airports, aviation expansion",
+      "subdomain": "Transportation and Infrastructure",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "86": {
+      "label": "Ethics, Morality & Philosophy",
+      "focus": "lying, free will, moral dilemmas, personal ethics",
+      "subdomain": "Ethics and Philosophy",
+      "domain": "Law, Rights and Ethical Frameworks"
+    },
+    "87": {
+      "label": "Taxation (Environmental & Consumption Taxes)",
+      "focus": "VAT, fuel tax, pollution taxes, targeted taxation",
+      "subdomain": "Environment & Climate",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "88": {
+      "label": "Public Health & Food Policy",
+      "focus": "sugar tax, obesity, food regulation",
+      "subdomain": "Public Health and Lifestyle Policy",
+      "domain": "Health, Healthcare & Bioethics"
+    },
+    "89": {
+      "label": "Policing & Law Enforcement Powers",
+      "focus": "police powers, corruption, stop-and-search",
+      "subdomain": "Criminal Justice & Policing",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "90": {
+      "label": "General Public Policy & Society",
+      "focus": "mixed policy issues: pandemics, recycling, divorce, systems",
+      "subdomain": "General Governance",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "91": {
+      "label": "Macroeconomics & Austerity",
+      "focus": "national debt, austerity, economic policy",
+      "subdomain": "Government Spending & Macroeconomics",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "92": {
+      "label": "Government Structure & Parliamentary Reform",
+      "focus": "House of Lords, MPs, political representation",
+      "subdomain": "Political Institutions",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "93": {
+      "label": "Education Policy & Curriculum",
+      "focus": "school subjects, inclusion, resources, learning methods",
+      "subdomain": "Education & Children",
+      "domain": "Society, Education & Culture"
+    },
+    "94": {
+      "label": "Smoking, Public Health & Personal Freedom",
+      "focus": "smoking bans, vaping, public/private rights",
+      "subdomain": "Harmful Substance Regulation",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "95": {
+      "label": "Social Policy & Cultural Development",
+      "focus": "societal values, education, refugees, entrepreneurship",
+      "subdomain": "General Governance",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "96": {
+      "label": "Inequality, Pay & Economic Fairness",
+      "focus": "gender pay gap, wealth inequality, wages",
+      "subdomain": "Taxation & Inequality",
+      "domain": "Economy, Labour & Welfare"
+    },
+    "97": {
+      "label": "Advertising, Regulation & Public Health",
+      "focus": "junk food ads, political ads, children's advertising",
+      "subdomain": "Consumer Protection & Advertising",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "98": {
+      "label": "Immigration Policy",
+      "focus": "border control, migration levels, citizenship",
+      "subdomain": "Immigration & Borders",
+      "domain": "International Relations & Migration"
+    },
+    "99": {
+      "label": "Transport Policy & Urban Mobility",
+      "focus": "car bans, traffic laws, autonomous vehicles",
+      "subdomain": "Transportation and Infrastructure",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "100": {
+      "label": "Global Issues & Technology Impact",
+      "focus": "globalisation, internet, society-wide effects",
+      "subdomain": "AI, Innovation and Science Policy",
+      "domain": "Technology and Digital Society"
+    },
+    "101": {
+      "label": "Electoral Systems & Democracy",
+      "focus": "voting systems, democracy reforms",
+      "subdomain": "Elections and Democracy",
+      "domain": "Governance, Politics and Public Administration"
+    },
+    "102": {
+      "label": "Gun Control & Weapons Policy",
+      "focus": "firearms regulation, ownership rights",
+      "subdomain": "Weapons & Hazardous Items",
+      "domain": "Public Safety, Consumer Protection & Specific Regulations"
+    },
+    "103": {
+      "label": "Transport Technology & Environmental Policy",
+      "focus": "electric cars, autonomous vehicles, emissions",
+      "subdomain": "Transportation and Infrastructure",
+      "domain": "Environment, Energy and Infrastructure"
+    },
+    "104": {
+      "label": "Government Responsibility & Public Services",
+      "focus": "state role in welfare, health, infrastructure, regulation",
+      "subdomain": "General Governance",
+      "domain": "Governance, Politics and Public Administration"
+    }
+  }
+}

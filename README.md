@@ -23,7 +23,7 @@ Pilot: **gender** (female, male), explicit cue, pattern-based preamble.
 
 ## Data
 
-`data/hby.csv` is Habermas-hybrid (HBY), copied unchanged from
+`data/hby.csv` is Habermas-hybrid (HBY), copied (plus the topic columns, see below) from
 `opinion_judge_stability_bias/artifacts/generations/habermas_hybrid/llama-3.3-70b_hb_reflective_person.csv`:
 500 Habermas Machine situations, 2686 human opinions (`origin == human`) and one synthetic
 opinion per situation and stance by Llama-3.3-70B (`origin == synthetic`, 1500).
@@ -33,6 +33,29 @@ opinion per situation and stance by Llama-3.3-70B (`origin == synthetic`, 1500).
 | `data/hby.csv` | original HBY |
 | `data/hby_reference_{variable}.csv` | the human opinions (references), one row per opinion and level |
 | `data/hby_candidate_{variable}.csv` | the synthetic opinions (candidates), one row per opinion and level |
+| `data/hb_topic_taxonomy.json` | the topic taxonomy: `topics` (id -> label, focus, subdomain, domain) and `domains` (domain -> subdomains -> topic ids) |
+| `data/hb_situation_topics.csv` | all 2280 Habermas situations with their topic columns |
+
+### Topics
+
+Every situation has a Habermas Machine topic (`question.topic`, an integer 0-104), grouped into
+35 subdomains and 10 domains. `topics.py` (the taxonomy is `TAXONOMY` there) writes the two
+`hb_*` files above and adds these columns, right after `situation`, to `data/hby*.csv` and to
+every CSV in `scores/`; `score.py` carries them into new score files:
+
+| Column | |
+|---|---|
+| `topic` | Habermas topic id (0-104) |
+| `topic_label` | e.g. `Transport Policy & Urban Mobility` |
+| `topic_subdomain` | e.g. `Transportation and Infrastructure` |
+| `topic_domain` | e.g. `Environment, Energy and Infrastructure` |
+
+```bash
+python topics.py                     # downloads the Habermas candidate comparisons (~400 MB)
+python topics.py --parquet path/to/hm_all_candidate_comparisons.parquet
+```
+
+It is idempotent: rerun it after adding data or score files written before the topic columns.
 
 The intervened files keep all the HBY columns, with `text` holding the intervened opinion and
 `text_id` made unique as `{original_text_id}_{variable}_{level}`, so they can be paired by
@@ -137,3 +160,23 @@ By situation (`situations.csv`): every gap and unsigned measure averaged over th
 pairs and prompts, with a standard error clustered by reference opinion. `top_situations.csv` /
 `.png` rank the situations by the female - male gap averaged over the judges (`--top` of them
 plotted), and `situation_agreement.csv` is the Spearman correlation of those gaps between judges.
+
+By topic (needs the topic columns, see Topics): `topics.csv` has every signed gap and the levels/cue
+mean absolute differences by topic domain (10) and subdomain (34), with 95% CIs by bootstrap over
+the topic's situations; `topics_{domain,subdomain}.png` plot the signed gaps of the groups with at
+least `--min_situations` situations (default 5). The topics (103 labels, median 4 situations) are
+too small for this. `topic_heterogeneity.csv` tests whether the topics differ more than random
+groups of situations of the same sizes: eta2 (the between-topic share of the variance of the
+per-situation values), its expected value with no topic effect, (G - 1) / (N - 1), and a
+permutation p-value (`--n_perm`, default 2000). There are 30 such tests per run (3 judges x 2
+groupings x 5 measures), so correct for multiple comparisons before reading single p-values.
+
+`--relative` writes the same tables and plots with a `_relative` suffix, as percentage changes per
+situation: for each situation, its mean difference over its mean baseline score (mean female 0.15
+vs mean neutral 0.10 is +50%), then the unweighted mean of those percentages over the situations
+(95% CI by bootstrap over situations). The signed gaps are relative to the situation's mean neutral
+score (so female - male is the difference of female - neutral and male - neutral), the unsigned
+differences to the mean of the compared scores. Per-pair ratios are not used, since many scores are
+0. A situation with a low baseline gets a large percentage (e.g. Llama's neutral mean is 0.04 in one
+situation) and weighs as much as any other in the mean, so read the relative results together with
+the baselines.

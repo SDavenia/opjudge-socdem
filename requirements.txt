@@ -5,6 +5,7 @@
 #   pip install -r requirements.txt && pip uninstall -y torchcodec
 --extra-index-url https://download.pytorch.org/whl/cu129
 pandas>=2.2
+pyarrow>=17  # topics.py reads the Habermas parquet
 tqdm==4.68.3
 matplotlib==3.10.9  # analyze.py
 # local judges

@@ -35,6 +35,7 @@ import pandas as pd
 from add_sociodem_preamble import DATA_DIR, SOCIODEMOGRAPHICS, SPLITS
 from judges import is_local, run_judge
 from prompts import SCORING_PROMPTS
+from topics import TOPIC_COLUMNS
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "scores"
 
@@ -46,7 +47,7 @@ SETUPS = {
 ORIGINAL_LEVEL = "original"
 SIDE_COLUMNS = ["text_id", "original_text_id", "level", "stance", "stance_group", "text"]
 PAIR_KEYS = ["reference_original_text_id", "candidate_original_text_id"]
-BY_PROMPT_COLUMNS = (["pair_id", "situation_id"]
+BY_PROMPT_COLUMNS = (["pair_id", "situation_id"] + TOPIC_COLUMNS
                      + [f"{side}_{c}" for side in SPLITS for c in SIDE_COLUMNS if c != "text"]
                      + ["prompt_variation", "answer", "score"])
 # "0.75", ".75", "1.0", "0", "1", but not the "1" of "10"
@@ -99,7 +100,7 @@ def load_side(side, intervened, variable, data_dir):
     else:
         df = pd.read_csv(data_dir / "hby.csv")
         df = df[df["origin"] == SPLITS[side]].assign(original_text_id=lambda d: d["text_id"], level=ORIGINAL_LEVEL)
-    return df[["situation_id", "situation"] + SIDE_COLUMNS].rename(columns={c: f"{side}_{c}" for c in SIDE_COLUMNS})
+    return df[["situation_id", "situation"] + TOPIC_COLUMNS + SIDE_COLUMNS].rename(columns={c: f"{side}_{c}" for c in SIDE_COLUMNS})
 
 
 def build_pairs(args):
@@ -107,7 +108,7 @@ def build_pairs(args):
     pair (its sociodemographic levels) consecutive."""
     intervened = SETUPS[args.setup]
     references = load_side("reference", intervened["reference"], args.variable, args.data_dir)
-    candidates = load_side("candidate", intervened["candidate"], args.variable, args.data_dir).drop(columns="situation")
+    candidates = load_side("candidate", intervened["candidate"], args.variable, args.data_dir).drop(columns=["situation"] + TOPIC_COLUMNS)
     if args.num_situations is not None:
         keep = pd.read_csv(args.data_dir / "hby.csv", usecols=["situation_id"])["situation_id"].drop_duplicates()
         keep = keep.head(args.num_situations)
