@@ -88,7 +88,9 @@ def run_vllm(spec, prompts, *, max_new_tokens, group_size=1, tensor_parallel_siz
     pp = pipeline_parallel_size or max(1, torch.cuda.device_count() // tp)
     kwargs = {}
     if spec.slow_tokenizer:
-        kwargs["tokenizer_mode"] = "slow"
+        # vLLM no longer has a "slow" tokenizer mode (and refuses "hf" for Mistral repos with
+        # transformers < 5.15); Mistral's own mistral_common tokenizer avoids the fast HF one.
+        kwargs["tokenizer_mode"] = "mistral"
     if spec.is_vlm:
         kwargs["limit_mm_per_prompt"] = {"image": 0}  # text only: no memory for the vision encoder
     llm = LLM(model=spec.name, dtype="bfloat16", tensor_parallel_size=tp, pipeline_parallel_size=pp,
