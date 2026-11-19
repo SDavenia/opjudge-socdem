@@ -2,19 +2,29 @@
 Score how well each candidate opinion reflects its reference with an LLM judge, on the [0, 1]
 alignment scale of opinion_judge_stability_bias, with each of its 5 prompt variations.
 
-A pair is a reference (a human Habermas opinion) and a candidate (a synthetic HBY opinion) of
-the same situation: each reference is paired with all the candidates of its situation. The
-reference is the first opinion of the prompt and the candidate the second, as the prompts ask
-"how well the second opinion aligns with the first".
+A pair is a reference and a candidate of the same situation: each reference is paired with all
+the candidates of its situation. The reference is the first opinion of the prompt and the
+candidate the second, as the prompts ask "how well the second opinion aligns with the first".
+Datasets (--dataset, see add_sociodem_preamble.DATASETS):
+  hby  the pilot: human Habermas opinions (references) x synthetic HBY opinions (candidates)
+  hb   human Habermas opinions (references) x synthetic ones (candidates) of the selected
+       situations; the situation is the question (question.text)
+  vp   the synthetic ValuePrism opinions of the selected situations, paired with each other: every
+       ordered pair of two different opinions of a situation (a reference is never its own candidate)
 
 Setups (--setup), by which side carries the sociodemographic preamble of --variable:
   none       original references x original candidates (baseline)
-  reference  hby_reference_{variable} (every level, neutral included) x original candidates
-A new setup (e.g. intervened candidates, or both sides) is one more entry of SETUPS: each side
-is read and paired the same way, with its level in reference_level / candidate_level
-("original" when it is not intervened).
+  reference  {dataset}_reference_{variable} (every level, neutral included) x original candidates
+  candidate  original references x {dataset}_candidate_{variable} (every level, neutral included)
+  both       {dataset}_reference_{variable} x {dataset}_candidate_{variable}: every combination of a
+             reference level and a candidate level (3 x 3 = 9 versions of each pair for gender), so
+             that same-group (female x female) and different-group (female x male) pairs can be
+             compared, each against neutral x neutral
+Each side is read and paired the same way, with its level in reference_level / candidate_level
+("original" when it is not intervened); a new setup is one more entry of SETUPS.
 
-Output, in {output_dir}/{setup}[_{variable}]/:
+Output, in {output_dir}/{setup}[_{variable}]/ for hby and {output_dir}/{dataset}_{setup}[_{variable}]/
+otherwise:
   {judge}_by_prompt.csv  one row per pair and prompt variation: the judge's answer and its score
                          (no texts: they are in the _mean file and in data/)
   {judge}_mean.csv       one row per pair, with the texts: the mean and std of the score over the
@@ -25,6 +35,10 @@ Usage:
     python score.py --setup reference --variable gender --judge_model_id gemma3 --num_situations 10
     python score.py --setup none --judge_model_id openai/gpt-5.4-nano
     python score.py --setup reference --variable gender --judge_model_id llama-3.2-1b --backend transformers
+    python score.py --dataset hb --setup reference --variable gender --judge_model_id gemma3
+    python score.py --dataset vp --setup reference --variable gender --judge_model_id gemma3
+    python score.py --dataset hb --setup candidate --variable gender --judge_model_id gemma3
+    python score.py --dataset hb --setup both --variable gender --judge_model_id gemma3
 """
 import argparse
 import re
@@ -32,9 +46,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from add_sociodem_preamble import DATA_DIR, SOCIODEMOGRAPHICS, SPLITS
+from add_sociodem_preamble import DATA_DIR, DATASETS, SOCIODEMOGRAPHICS
 from judges import is_local, run_judge
 from prompts import SCORING_PROMPTS
+from prepare_data import SELECTION_COLUMNS
 from topics import TOPIC_COLUMNS
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "scores"
@@ -43,26 +58,30 @@ OUTPUT_DIR = Path(__file__).resolve().parent / "scores"
 SETUPS = {
     "none": {"reference": False, "candidate": False},
     "reference": {"reference": True, "candidate": False},
+    "candidate": {"reference": False, "candidate": True},
+    "both": {"reference": True, "candidate": True},
 }
 ORIGINAL_LEVEL = "original"
 SIDE_COLUMNS = ["text_id", "original_text_id", "level", "stance", "stance_group", "text"]
 PAIR_KEYS = ["reference_original_text_id", "candidate_original_text_id"]
-BY_PROMPT_COLUMNS = (["pair_id", "situation_id"] + TOPIC_COLUMNS
-                     + [f"{side}_{c}" for side in SPLITS for c in SIDE_COLUMNS if c != "text"]
-                     + ["prompt_variation", "answer", "score"])
+# Situation-level columns carried into the score files, those of them that the dataset has (the
+# Habermas topics: hby and hb; the columns of selected_situations.csv: hb and vp).
+SITUATION_COLUMNS = TOPIC_COLUMNS + list(SELECTION_COLUMNS.values()) + ["stance_label_mismatch"]
+SIDES = ["reference", "candidate"]
 # "0.75", ".75", "1.0", "0", "1", but not the "1" of "10"
 SCORE_RE = re.compile(r"(?<!\d)(?:0?\.\d+|1\.0+|0|1)(?!\d)")
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--dataset", choices=list(DATASETS), default="hby")
     parser.add_argument("--setup", required=True, choices=list(SETUPS))
     parser.add_argument("--variable", choices=list(SOCIODEMOGRAPHICS),
                         help="Sociodemographic of the preamble, for the setups that intervene on a side.")
     parser.add_argument("--judge_model_id", required=True,
                         help="A local judge of judges.REGISTRY, or an OpenRouter slug (e.g. openai/gpt-5.4-nano).")
     parser.add_argument("--num_situations", type=int, default=None,
-                        help="Only the first N situations (in the order of data/hby.csv).")
+                        help="Only the first N situations (in the order of the dataset's file).")
     parser.add_argument("--data_dir", type=Path, default=DATA_DIR)
     parser.add_argument("--output_dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--max_new_tokens", type=int, default=5)
@@ -93,28 +112,38 @@ def parse_args():
     return args
 
 
-def load_side(side, intervened, variable, data_dir):
+def situation_columns(df):
+    return [c for c in SITUATION_COLUMNS if c in df.columns]
+
+
+def load_side(side, intervened, variable, data_dir, dataset):
     """The opinions of one side, with their columns prefixed by the side."""
+    spec = DATASETS[dataset]
     if intervened:
-        df = pd.read_csv(data_dir / f"hby_{side}_{variable}.csv").rename(columns={variable: "level"})
+        df = pd.read_csv(data_dir / f"{dataset}_{side}_{variable}.csv").rename(columns={variable: "level"})
     else:
-        df = pd.read_csv(data_dir / "hby.csv")
-        df = df[df["origin"] == SPLITS[side]].assign(original_text_id=lambda d: d["text_id"], level=ORIGINAL_LEVEL)
-    return df[["situation_id", "situation"] + TOPIC_COLUMNS + SIDE_COLUMNS].rename(columns={c: f"{side}_{c}" for c in SIDE_COLUMNS})
+        df = pd.read_csv(data_dir / spec["file"])
+        df = df[df["origin"] == spec["splits"][side]].assign(original_text_id=lambda d: d["text_id"],
+                                                             level=ORIGINAL_LEVEL)
+    cols = ["situation_id", "situation"] + situation_columns(df) + SIDE_COLUMNS
+    return df[cols].rename(columns={c: f"{side}_{c}" for c in SIDE_COLUMNS})
 
 
 def build_pairs(args):
     """One row per reference and candidate of the same situation, the versions of each original
     pair (its sociodemographic levels) consecutive."""
     intervened = SETUPS[args.setup]
-    references = load_side("reference", intervened["reference"], args.variable, args.data_dir)
-    candidates = load_side("candidate", intervened["candidate"], args.variable, args.data_dir).drop(columns=["situation"] + TOPIC_COLUMNS)
+    references = load_side("reference", intervened["reference"], args.variable, args.data_dir, args.dataset)
+    candidates = load_side("candidate", intervened["candidate"], args.variable, args.data_dir, args.dataset)
+    candidates = candidates.drop(columns=["situation"] + situation_columns(candidates))
     if args.num_situations is not None:
-        keep = pd.read_csv(args.data_dir / "hby.csv", usecols=["situation_id"])["situation_id"].drop_duplicates()
-        keep = keep.head(args.num_situations)
+        keep = pd.read_csv(args.data_dir / DATASETS[args.dataset]["file"], usecols=["situation_id"])["situation_id"]
+        keep = keep.drop_duplicates().head(args.num_situations)
         references = references[references["situation_id"].isin(keep)]
         candidates = candidates[candidates["situation_id"].isin(keep)]
     pairs = references.merge(candidates, on="situation_id")
+    # vp: references and candidates are the same opinions; an opinion is not paired with itself
+    pairs = pairs[pairs["reference_original_text_id"] != pairs["candidate_original_text_id"]]
     pairs.insert(0, "pair_id", pairs["reference_text_id"] + "__" + pairs["candidate_text_id"])
     pairs["_pair"] = pairs.groupby(PAIR_KEYS, sort=False).ngroup()
     return pairs.sort_values("_pair", kind="stable").reset_index(drop=True)
@@ -144,7 +173,10 @@ def parse_score(answer, decimals=2):
 
 
 def scored_by_prompt(rows, answers, meta):
-    return rows.assign(answer=answers, score=[parse_score(a) for a in answers])[BY_PROMPT_COLUMNS].assign(**meta)
+    cols = (["pair_id", "situation_id"] + situation_columns(rows)
+            + [f"{side}_{c}" for side in SIDES for c in SIDE_COLUMNS if c != "text"]
+            + ["prompt_variation", "answer", "score"])
+    return rows.assign(answer=answers, score=[parse_score(a) for a in answers])[cols].assign(**meta)
 
 
 def mean_scores(pairs, by_prompt, meta):
@@ -158,11 +190,12 @@ def main():
     pairs = build_pairs(args)
     rows, prompts, group_size = expand_prompts(pairs)
     judge_name = args.judge_model_id.replace("/", "_")
-    out_dir = args.output_dir / (args.setup if args.variable is None else f"{args.setup}_{args.variable}")
+    out_name = args.setup if args.variable is None else f"{args.setup}_{args.variable}"
+    out_dir = args.output_dir / (out_name if args.dataset == "hby" else f"{args.dataset}_{out_name}")
     out_dir.mkdir(parents=True, exist_ok=True)
     by_prompt_path, mean_path = out_dir / f"{judge_name}_by_prompt.csv", out_dir / f"{judge_name}_mean.csv"
-    meta = {"judge_model": args.judge_model_id, "setup": args.setup, "variable": args.variable}
-    print(f"Setup {args.setup} | {pairs['situation_id'].nunique()} situations | {len(pairs)} pairs "
+    meta = {"judge_model": args.judge_model_id, "dataset": args.dataset, "setup": args.setup, "variable": args.variable}
+    print(f"Dataset {args.dataset} | setup {args.setup} | {pairs['situation_id'].nunique()} situations | {len(pairs)} pairs "
           f"({pairs['reference_text_id'].nunique()} references x their candidates) | "
           f"{len(SCORING_PROMPTS)} prompt variations | {len(prompts)} prompts | {group_size} versions per pair")
 

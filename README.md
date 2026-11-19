@@ -21,7 +21,49 @@ length and framing of the preamble are then the same.
 
 Pilot: **gender** (female, male), explicit cue, pattern-based preamble.
 
-## Data
+## Data: selected situations (HB + VP)
+
+The study now uses the situations of `data/selected_situations.csv`: 39 Habermas Machine (HB)
+questions and 43 ValuePrism (VP) situations, with their selection columns (`selection_topic`,
+`expected_authority`, `gender_role_reference`, `heteronormative`). The HB situation is the
+question (`question.text`, "Should we ban ...?"), both in the generation and the scoring
+prompts, not `question.affirming_statement` (kept as `hb_affirming_statement` for reference).
+
+```bash
+python prepare_data.py --valueprism path/to/ValuePrism/full.csv      # selection (CPU)
+python generate_opinions.py --generation_model_id llama-3.3-70b      # generation (GPU, vLLM)
+python add_sociodem_preamble.py --variable gender --dataset hb
+python add_sociodem_preamble.py --variable gender --dataset vp
+python score.py --dataset hb --setup reference --variable gender --judge_model_id gemma3
+python score.py --dataset vp --setup reference --variable gender --judge_model_id gemma3
+```
+
+| Dataset | References | Candidates | Pairs |
+|---|---|---|---|
+| `hb` | up to 6 human Habermas opinions per question, as balanced as possible over agree / disagree / neutral (a stance short of opinions gives its slots to the others; within a stance, different fine-grained ratings first) | 3 synthetic opinions per question, one per stance (`hb_reflective_person`, adapted to questions: answers YES / NO / stays neutral) | reference x candidate of the same question |
+| `vp` | 6 synthetic opinions per situation, one per ValuePrism row (vrd, value, explanation), the rows as balanced as possible over Supports / Opposes / Either and, within a valence, as different as possible (`reflective_person`) | the same opinions | every ordered pair of two different opinions of a situation |
+
+Generation as in opinion_judge_stability_bias (`prepare_habermas_hybrid.py`,
+`prepare_valueprism_generations.py`): Llama-3.3-70B, temperature 0.8, top_p 0.9, seed 0, up to
+256 new tokens (`finish_reason` says if one was cut). Files: `data/hb_human.csv` and
+`data/vp_selected.csv` (the selection), `data/hb.csv` and `data/vp.csv` (with the opinions,
+`origin` human / synthetic), `data/{hb,vp}_{reference,candidate}_{variable}.csv` (with the preamble;
+for vp the two hold the same opinions).
+
+Notes on the selection:
+- `S173961813` of the selection is not in the Habermas data; the same question text is
+  `S173965963`, used instead. `S173964089` is listed twice (once with a leading space).
+- 19 HB questions have fewer than 6 human opinions (down to 1, `HB_173961812`), and 4 VP
+  situations fewer than 6 ValuePrism rows (down to 3, `VPS_79`).
+- `HB_173966814` ("... an increase or decrease in the number of road accidents?") has no yes/no
+  answer: its candidates are told INCREASE (agree, as its affirming statement) / DECREASE / neutral
+  (`prompts.HB_STANCE_INSTRUCTIONS_BY_SITUATION`).
+- `HB_173962115` ("Is Manchester United a better football team than Liverpool?") has the affirming
+  statement "Football is a more interesting sport than rugby." in the Habermas data, which is what
+  its participants rated: its human stance labels do not refer to the question
+  (`stance_label_mismatch`).
+
+## Data: pilot (HBY)
 
 `data/hby.csv` is Habermas-hybrid (HBY), copied (plus the topic columns, see below) from
 `opinion_judge_stability_bias/artifacts/generations/habermas_hybrid/llama-3.3-70b_hb_reflective_person.csv`:
@@ -119,8 +161,14 @@ the candidate the second.
 |---|---|---|---|---|
 | `none` | original | original | 8,058 | 40,290 |
 | `reference` | `hby_reference_{variable}` (all levels) | original | 24,174 | 120,870 |
+| `candidate` | original | `hby_candidate_{variable}` (all levels) | 24,174 | 120,870 |
+| `both` | `hby_reference_{variable}` (all levels) | `hby_candidate_{variable}` (all levels), every reference x candidate level | 72,522 | 362,610 |
 
-Other setups (intervened candidates, both sides) are one more entry of `SETUPS` in `score.py`.
+With `--dataset hb` / `vp` the same setups give 609 / 1,236 pairs (`none`), 1,827 / 3,708
+(`reference`, `candidate`) and 5,481 / 11,124 (`both`). `commands/score_{hb,vp,hby}.sh` run the
+gender setups for the four judges (logs in `out/`).
+
+A new setup is one more entry of `SETUPS` in `score.py`.
 Judges: the local models of `judges.REGISTRY`, or any OpenRouter slug. Local judges run with
 vLLM by default (`--backend vllm`), split over all the visible GPUs by pipeline parallelism (the
 GPUs have no P2P link, so the all-reduces of tensor parallelism are slow: Gemma 3 27B is ~8x

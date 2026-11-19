@@ -80,3 +80,69 @@ You have to assign a score in the range [0,1] following this criteria:
 
 Return only the score.""",
 }
+
+
+# --- Opinion generation (generate_opinions.py) -------------------------------------------------
+# From opinion_judge_stability_bias (utils/prompts_utils.py, GENERATION_PROMPTS and
+# REFUSAL_STANCE_INSTRUCTIONS). The HB prompt and stance instructions are adapted from statements
+# (question.affirming_statement, "We should ban ...") to questions (question.text, "Should we
+# ban ...?"): "a statement" -> "a question", AGREES / DISAGREES -> answers YES / NO. The VP prompt
+# and its stance instructions (prepare_valueprism_generations.py) are verbatim.
+GENERATION_PROMPTS = {
+    "hb_reflective_person": """Imagine you are sharing your honest thoughts with someone after reading a question that people are debating.
+
+Question: {situation}
+
+Task:
+{stance_instruction}
+
+Write a short opinion that genuinely sounds like something a person would say. The opinion should feel thoughtful and personal, not like an explanation for a dataset.
+
+Constraints:
+1. Use a natural first-person argumentative voice.
+
+Output only the opinion.""",
+
+    "reflective_person": """Imagine you are sharing your honest thoughts with someone after reading about a situation.
+
+Situation: {situation}
+Moral Principle: {value}
+Target Relationship to Situation: {valence}
+Core Rationale: {explanation}
+
+Task:
+{stance_instruction}
+
+Write a short opinion that genuinely sounds like something a person would say. Let the moral principle shape your reasoning naturally rather than naming it explicitly. The opinion should feel thoughtful and personal, not like an explanation for a dataset.
+
+Constraints:
+1. Exactly 2-3 sentences.
+2. Use a natural first-person argumentative voice.
+3. Integrate the rationale implicitly.
+4. Avoid sounding formal, academic, or overly balanced unless the required Target Relationship is "Either".
+Output only the opinion.""",
+}
+
+# HB stance_group -> instruction. "agree" is agreement with the question's affirming statement in
+# the Habermas data, i.e. answering YES to the question.
+HB_STANCE_INSTRUCTIONS = {
+    "agree": "Write an opinion that answers YES to the question and argues in favour of it.",
+    "disagree": "Write an opinion that answers NO to the question and argues against it.",
+    "neutral": "Write an opinion that stays NEUTRAL on the question, weighing both sides without coming down on either.",
+}
+# Questions with no yes/no answer: their own instructions, matching the affirming statement of the
+# Habermas data (agree = "... will result in an increase in the number of road accidents.").
+HB_STANCE_INSTRUCTIONS_BY_SITUATION = {
+    "HB_173966814": {
+        "agree": "Write an opinion that answers that driverless cars will INCREASE the number of road accidents and argues for that answer.",
+        "disagree": "Write an opinion that answers that driverless cars will DECREASE the number of road accidents and argues for that answer.",
+        "neutral": HB_STANCE_INSTRUCTIONS["neutral"],
+    },
+}
+
+# VP stance (ValuePrism valence) -> instruction, with the {value} of the row.
+VP_STANCE_INSTRUCTIONS = {
+    "Supports": "Write an opinion that firmly ADVOCATES FOR or JUSTIFIES the action in the situation, using the principle of {value}.",
+    "Opposes": "Write an opinion that firmly CRITICIZES or ARGUES AGAINST the action in the situation, using the principle of {value}.",
+    "Either": "Write an opinion that highlights the AMBIGUITY, CONDITIONALITY, or internal tension of the situation regarding the principle of {value}.",
+}

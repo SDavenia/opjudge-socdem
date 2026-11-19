@@ -1,9 +1,11 @@
 """
-Add an explicit sociodemographic preamble ("As a woman, ...") to the Habermas-hybrid (HBY)
-opinions, one sociodemographic variable at a time.
+Add an explicit sociodemographic preamble ("As a woman, ...") to the opinions of a dataset
+(--dataset: hby, the Habermas-hybrid of the pilot; hb or vp, from generate_opinions.py), one
+sociodemographic variable at a time.
 
-References are the human Habermas opinions (origin == human), candidates the synthetic ones
-(origin == synthetic). Each opinion is written once per level of the variable, plus a neutral
+For hby and hb, references are the human Habermas opinions (origin == human), candidates the
+synthetic ones (origin == synthetic). For vp, all the opinions are synthetic and are both
+references and candidates (the two output files hold the same opinions). Each opinion is written once per level of the variable, plus a neutral
 level whose identity phrase names no sociodemographic ("a person"): it adds the same preamble,
 so it controls for the extra length and framing of the other levels.
 
@@ -21,11 +23,13 @@ the case of its first letter may change). The slot goes
 The first word after the slot is lowercased, unless it is "I", an acronym or a proper noun (a
 word that is mostly capitalised mid-sentence in the corpus).
 
-Output: {output_dir}/hby_reference_{variable}.csv, {output_dir}/hby_candidate_{variable}.csv,
+Output: {output_dir}/{dataset}_reference_{variable}.csv, {output_dir}/{dataset}_candidate_{variable}.csv,
 in long format: one row per opinion and level, the level in the {variable} column.
 
 Usage:
-    python add_sociodem_preamble.py --variable gender
+    python add_sociodem_preamble.py --variable gender                 # hby
+    python add_sociodem_preamble.py --variable gender --dataset hb
+    python add_sociodem_preamble.py --variable gender --dataset vp
 """
 import argparse
 import logging
@@ -54,8 +58,15 @@ SOCIODEMOGRAPHICS = {
     },
 }
 
-# Output split -> origin of its opinions in HBY.
-SPLITS = {"reference": "human", "candidate": "synthetic"}
+# Dataset -> its file in data/ and, for each output split, the origin of its opinions. HB: the human
+# Habermas opinions are the references, the synthetic ones the candidates (as HBY). VP has only
+# synthetic opinions, which are both references and candidates (score.py pairs them with each other).
+DATASETS = {
+    "hby": {"file": "hby.csv", "splits": {"reference": "human", "candidate": "synthetic"}},
+    "hb": {"file": "hb.csv", "splits": {"reference": "human", "candidate": "synthetic"}},
+    "vp": {"file": "vp.csv", "splits": {"reference": "synthetic", "candidate": "synthetic"}},
+}
+SPLITS = DATASETS["hby"]["splits"]
 
 APOS = "'’"
 DISCOURSE_MARKERS = ["to be honest", "to be fair", "of course", "honestly", "frankly", "personally", "well", "yes",
@@ -153,16 +164,18 @@ def intervene(df, variable, proper_nouns):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--variable", required=True, choices=list(SOCIODEMOGRAPHICS))
-    parser.add_argument("--input", type=Path, default=DATA_DIR / "hby.csv")
+    parser.add_argument("--dataset", choices=list(DATASETS), default="hby")
+    parser.add_argument("--input", type=Path, default=None, help="Default: data/{dataset file}.")
     parser.add_argument("--output_dir", type=Path, default=DATA_DIR)
     args = parser.parse_args()
 
-    hby = pd.read_csv(args.input)
-    proper_nouns = find_proper_nouns(pd.concat([hby["text"], hby["situation"].drop_duplicates()]))
+    spec = DATASETS[args.dataset]
+    data = pd.read_csv(args.input or DATA_DIR / spec["file"])
+    proper_nouns = find_proper_nouns(pd.concat([data["text"], data["situation"].drop_duplicates()]))
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    for split, origin in SPLITS.items():
-        out = intervene(hby[hby["origin"] == origin], args.variable, proper_nouns)
-        out_path = args.output_dir / f"hby_{split}_{args.variable}.csv"
+    for split, origin in spec["splits"].items():
+        out = intervene(data[data["origin"] == origin], args.variable, proper_nouns)
+        out_path = args.output_dir / f"{args.dataset}_{split}_{args.variable}.csv"
         out.to_csv(out_path, index=False)
         log.info("Wrote %d rows (%d opinions x %d levels) to %s", len(out), out["original_text_id"].nunique(),
                  out[args.variable].nunique(), out_path)
