@@ -1,0 +1,25 @@
+measure,judge_a,judge_b,spearman
+match excess,gemma3,llama-3.3-70b,0.4349139232860163
+match excess,gemma3,qwen2.5-72b,0.41875566294170946
+match excess,gemma3,mistral-24b,0.3572938689217759
+match excess,llama-3.3-70b,qwen2.5-72b,0.31048021745696164
+match excess,llama-3.3-70b,mistral-24b,0.5066445182724253
+match excess,qwen2.5-72b,mistral-24b,0.5990637269707038
+same - cross,gemma3,llama-3.3-70b,0.13983690727876774
+same - cross,gemma3,qwen2.5-72b,0.452431289640592
+same - cross,gemma3,mistral-24b,0.47115675022651765
+same - cross,llama-3.3-70b,qwen2.5-72b,0.07022047719722138
+same - cross,llama-3.3-70b,mistral-24b,0.08018725460585925
+same - cross,qwen2.5-72b,mistral-24b,0.2219873150105708
+cand F - M | ref N,gemma3,llama-3.3-70b,0.2040169133192389
+cand F - M | ref N,gemma3,qwen2.5-72b,0.4109030504379342
+cand F - M | ref N,gemma3,mistral-24b,0.16883116883116883
+cand F - M | ref N,llama-3.3-70b,qwen2.5-72b,0.43717909996979765
+cand F - M | ref N,llama-3.3-70b,mistral-24b,0.1665659921473875
+cand F - M | ref N,qwen2.5-72b,mistral-24b,0.49607369374811233
+F|F - M|M,gemma3,llama-3.3-70b,0.16868015705225006
+F|F - M|M,gemma3,qwen2.5-72b,0.3299607369374811
+F|F - M|M,gemma3,mistral-24b,0.4335548172757475
+F|F - M|M,llama-3.3-70b,qwen2.5-72b,0.3927816369676835
+F|F - M|M,llama-3.3-70b,mistral-24b,0.3021745696164301
+F|F - M|M,qwen2.5-72b,mistral-24b,0.42917547568710357

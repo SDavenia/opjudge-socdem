@@ -1,0 +1,225 @@
+judge,metric,unit,relation,mean,ci_low,ci_high,n,n_eligible
+gemma3,match vs cross,pair,all,0.020227774944756076,0.012361604087348283,0.028923207143425955,5883,5883
+gemma3,match vs cross,pair,close (margin <= 0.1),0.21691176470588236,0.14096766119343213,0.28575892857142854,272,272
+gemma3,match vs cross,pair,opposite over partial,0.04081632653061224,0.009947797956032645,0.07895539152759948,196,196
+gemma3,match vs cross,pair,opposite over same,0.009389671361502348,0.0,0.026059074197860948,213,213
+gemma3,match vs cross,pair,partial over opposite,0.0033222591362126247,0.0,0.008260134573546355,1505,1505
+gemma3,match vs cross,pair,partial over partial,0.05058365758754864,0.011146333220682663,0.1146842670310365,257,257
+gemma3,match vs cross,pair,partial over same,0.12137203166226913,0.06101051276550097,0.20051773271546477,379,379
+gemma3,match vs cross,pair,same over opposite,0.001973684210526316,0.0,0.004225402036620677,1520,1520
+gemma3,match vs cross,pair,same over partial,0.023166023166023165,0.014474966959228891,0.0317497060552616,1813,1813
+gemma3,match vs cross,top-1,all,0.04391008886565604,0.027860826632901382,0.06194629971127926,1913,1913
+gemma3,match vs cross,top-1,close (margin <= 0.1),0.22277227722772278,0.14285714285714285,0.2984330413637378,202,202
+gemma3,match vs cross,top-1,opposite,0.037037037037037035,0.0053742106161461,0.08092876113107327,189,189
+gemma3,match vs cross,top-1,partial,0.21578947368421053,0.11175850475810588,0.3403392168542496,190,190
+gemma3,match vs cross,top-1,same,0.02346805736636245,0.012952739884315622,0.03423921401500341,1534,1534
+gemma3,cross vs match,pair,all,0.00016998130205677376,0.0,0.0005269612296064822,5883,5883
+gemma3,cross vs match,pair,close (margin <= 0.1),0.003676470588235294,0.0,0.011457090887404575,272,272
+gemma3,cross vs match,pair,opposite over partial,0.0,0.0,0.0,196,196
+gemma3,cross vs match,pair,opposite over same,0.0,0.0,0.0,213,213
+gemma3,cross vs match,pair,partial over opposite,0.0,0.0,0.0,1505,1505
+gemma3,cross vs match,pair,partial over partial,0.0,0.0,0.0,257,257
+gemma3,cross vs match,pair,partial over same,0.0,0.0,0.0,379,379
+gemma3,cross vs match,pair,same over opposite,0.0,0.0,0.0,1520,1520
+gemma3,cross vs match,pair,same over partial,0.0005515719801434088,0.0,0.0017271405888111553,1813,1813
+gemma3,cross vs match,top-1,all,0.0005227391531625719,0.0,0.00162098777394123,1913,1913
+gemma3,cross vs match,top-1,close (margin <= 0.1),0.0049504950495049506,0.0,0.016492776886035305,202,202
+gemma3,cross vs match,top-1,opposite,0.0,0.0,0.0,189,189
+gemma3,cross vs match,top-1,partial,0.0,0.0,0.0,190,190
+gemma3,cross vs match,top-1,same,0.000651890482398957,0.0,0.002031282102903033,1534,1534
+gemma3,match vs neutral,pair,all,0.006969233384327724,0.0036494519655175975,0.01111519069748993,5883,5883
+gemma3,match vs neutral,pair,close (margin <= 0.1),0.08823529411764706,0.04615030674846626,0.13403836656583737,272,272
+gemma3,match vs neutral,pair,opposite over partial,0.01020408163265306,0.0,0.02410077202011931,196,196
+gemma3,match vs neutral,pair,opposite over same,0.004694835680751174,0.0,0.017047889610389607,213,213
+gemma3,match vs neutral,pair,partial over opposite,0.0,0.0,0.0,1505,1505
+gemma3,match vs neutral,pair,partial over partial,0.0038910505836575876,0.0,0.013050724637681152,257,257
+gemma3,match vs neutral,pair,partial over same,0.04221635883905013,0.008378724394785847,0.07980807026361743,379,379
+gemma3,match vs neutral,pair,same over opposite,0.0,0.0,0.0,1520,1520
+gemma3,match vs neutral,pair,same over partial,0.011583011583011582,0.005623824067955631,0.017829166224259587,1813,1813
+gemma3,match vs neutral,top-1,all,0.014636696288552013,0.006510157387262571,0.025327533625441802,1913,1913
+gemma3,match vs neutral,top-1,close (margin <= 0.1),0.08415841584158416,0.03954454370877516,0.13636984600099353,202,202
+gemma3,match vs neutral,top-1,opposite,0.005291005291005291,0.0,0.017857142857142856,189,189
+gemma3,match vs neutral,top-1,partial,0.05263157894736842,0.0,0.11488725440293185,190,190
+gemma3,match vs neutral,top-1,same,0.01108213820078227,0.005140323196377107,0.018314929762826657,1534,1534
+gemma3,phrase control,pair,all,0.006471389645776567,0.0029323560353255347,0.010872101635079253,5872,5872
+gemma3,phrase control,pair,close (margin <= 0.1),0.06666666666666667,0.033217109086323915,0.10526794258373205,300,300
+gemma3,phrase control,pair,opposite over partial,0.020512820512820513,0.0,0.07017543859649122,195,195
+gemma3,phrase control,pair,opposite over same,0.004694835680751174,0.0,0.01675977653631285,213,213
+gemma3,phrase control,pair,partial over opposite,0.0006640106241699867,0.0,0.002072256036565659,1506,1506
+gemma3,phrase control,pair,partial over partial,0.027131782945736434,0.0,0.06489379356123463,258,258
+gemma3,phrase control,pair,partial over same,0.027777777777777776,0.006308159370271847,0.06235889110889109,360,360
+gemma3,phrase control,pair,same over opposite,0.0013201320132013201,0.0,0.004289162273113711,1515,1515
+gemma3,phrase control,pair,same over partial,0.007123287671232876,0.0015815413947637394,0.016162386153882487,1825,1825
+gemma3,phrase control,top-1,all,0.009429020429544265,0.003987892023774729,0.015839423928772037,1909,1909
+gemma3,phrase control,top-1,close (margin <= 0.1),0.053811659192825115,0.01874766791044776,0.09523809523809523,223,223
+gemma3,phrase control,top-1,opposite,0.02127659574468085,0.0,0.07453416149068323,188,188
+gemma3,phrase control,top-1,partial,0.043243243243243246,0.012112299465240643,0.08066155258326775,185,185
+gemma3,phrase control,top-1,same,0.00390625,0.0012618097628699068,0.007942155405013982,1536,1536
+llama-3.3-70b,match vs cross,pair,all,0.004763525008506295,0.0024113908733001833,0.007436953768048766,5878,5878
+llama-3.3-70b,match vs cross,pair,close (margin <= 0.1),0.05365853658536585,0.025423728813559324,0.09442326991651187,205,205
+llama-3.3-70b,match vs cross,pair,opposite over partial,0.012422360248447204,0.0,0.03821656050955414,161,161
+llama-3.3-70b,match vs cross,pair,opposite over same,0.0,0.0,0.0,183,183
+llama-3.3-70b,match vs cross,pair,partial over opposite,0.0,0.0,0.0,1550,1550
+llama-3.3-70b,match vs cross,pair,partial over partial,0.004484304932735426,0.0,0.014423076923076924,223,223
+llama-3.3-70b,match vs cross,pair,partial over same,0.030927835051546393,0.010101010101010102,0.05750480769230769,388,388
+llama-3.3-70b,match vs cross,pair,same over opposite,0.0,0.0,0.0,1529,1529
+llama-3.3-70b,match vs cross,pair,same over partial,0.0070498915401301515,0.0016161197205198257,0.014809528175691122,1844,1844
+llama-3.3-70b,match vs cross,top-1,all,0.013896037056098817,0.006702353292740185,0.02204882681122146,1943,1943
+llama-3.3-70b,match vs cross,top-1,close (margin <= 0.1),0.078125,0.03409090909090909,0.14037471395881004,128,128
+llama-3.3-70b,match vs cross,top-1,opposite,0.012422360248447204,0.0,0.03821656050955414,161,161
+llama-3.3-70b,match vs cross,top-1,partial,0.05357142857142857,0.01801399613899614,0.0981423588258523,224,224
+llama-3.3-70b,match vs cross,top-1,same,0.00834403080872914,0.0019931575973316388,0.016827090533420803,1558,1558
+llama-3.3-70b,cross vs match,pair,all,0.001701258931609391,0.00018993119928429293,0.0036469998744188365,5878,5878
+llama-3.3-70b,cross vs match,pair,close (margin <= 0.1),0.02926829268292683,0.004949885382626933,0.06896551724137931,205,205
+llama-3.3-70b,cross vs match,pair,opposite over partial,0.0,0.0,0.0,161,161
+llama-3.3-70b,cross vs match,pair,opposite over same,0.0,0.0,0.0,183,183
+llama-3.3-70b,cross vs match,pair,partial over opposite,0.0,0.0,0.0,1550,1550
+llama-3.3-70b,cross vs match,pair,partial over partial,0.0,0.0,0.0,223,223
+llama-3.3-70b,cross vs match,pair,partial over same,0.007731958762886598,0.0,0.02459016393442623,388,388
+llama-3.3-70b,cross vs match,pair,same over opposite,0.0,0.0,0.0,1529,1529
+llama-3.3-70b,cross vs match,pair,same over partial,0.003796095444685466,0.0005595814501541004,0.00778220937228135,1844,1844
+llama-3.3-70b,cross vs match,top-1,all,0.0051466803911477095,0.0009978924416442821,0.010411244143675169,1943,1943
+llama-3.3-70b,cross vs match,top-1,close (margin <= 0.1),0.046875,0.008190215977101224,0.10744814454707502,128,128
+llama-3.3-70b,cross vs match,top-1,opposite,0.0,0.0,0.0,161,161
+llama-3.3-70b,cross vs match,top-1,partial,0.013392857142857142,0.0,0.04455999704448056,224,224
+llama-3.3-70b,cross vs match,top-1,same,0.004492939666238768,0.0011328497140379369,0.009163660819842207,1558,1558
+llama-3.3-70b,match vs neutral,pair,all,0.0005103776794828172,0.0,0.0011472970693469497,5878,5878
+llama-3.3-70b,match vs neutral,pair,close (margin <= 0.1),0.004878048780487805,0.0,0.015968346703871632,205,205
+llama-3.3-70b,match vs neutral,pair,opposite over partial,0.0,0.0,0.0,161,161
+llama-3.3-70b,match vs neutral,pair,opposite over same,0.0,0.0,0.0,183,183
+llama-3.3-70b,match vs neutral,pair,partial over opposite,0.0,0.0,0.0,1550,1550
+llama-3.3-70b,match vs neutral,pair,partial over partial,0.0,0.0,0.0,223,223
+llama-3.3-70b,match vs neutral,pair,partial over same,0.007731958762886598,0.0,0.01812688821752266,388,388
+llama-3.3-70b,match vs neutral,pair,same over opposite,0.0,0.0,0.0,1529,1529
+llama-3.3-70b,match vs neutral,pair,same over partial,0.0,0.0,0.0,1844,1844
+llama-3.3-70b,match vs neutral,top-1,all,0.001544004117344313,0.0,0.0034062977024541066,1943,1943
+llama-3.3-70b,match vs neutral,top-1,close (margin <= 0.1),0.0078125,0.0,0.028043995767942156,128,128
+llama-3.3-70b,match vs neutral,top-1,opposite,0.0,0.0,0.0,161,161
+llama-3.3-70b,match vs neutral,top-1,partial,0.013392857142857142,0.0,0.033907990314769966,224,224
+llama-3.3-70b,match vs neutral,top-1,same,0.0,0.0,0.0,1558,1558
+llama-3.3-70b,phrase control,pair,all,0.0017006802721088435,0.00033695993106322073,0.0034757422738527833,5880,5880
+llama-3.3-70b,phrase control,pair,close (margin <= 0.1),0.020833333333333332,0.0,0.05263157894736842,192,192
+llama-3.3-70b,phrase control,pair,opposite over partial,0.0,0.0,0.0,161,161
+llama-3.3-70b,phrase control,pair,opposite over same,0.0,0.0,0.0,183,183
+llama-3.3-70b,phrase control,pair,partial over opposite,0.0,0.0,0.0,1557,1557
+llama-3.3-70b,phrase control,pair,partial over partial,0.0,0.0,0.0,223,223
+llama-3.3-70b,phrase control,pair,partial over same,0.02040816326530612,0.0025502171901506192,0.04572616298251401,392,392
+llama-3.3-70b,phrase control,pair,same over opposite,0.0,0.0,0.0,1527,1527
+llama-3.3-70b,phrase control,pair,same over partial,0.0010887316276537834,0.0,0.003430629915925463,1837,1837
+llama-3.3-70b,phrase control,top-1,all,0.005157297576070139,0.0009613392361098596,0.010428548447791976,1939,1939
+llama-3.3-70b,phrase control,top-1,close (margin <= 0.1),0.030534351145038167,0.0,0.07089304934005548,131,131
+llama-3.3-70b,phrase control,top-1,opposite,0.0,0.0,0.0,161,161
+llama-3.3-70b,phrase control,top-1,partial,0.03524229074889868,0.003982887348244816,0.0874366232888288,227,227
+llama-3.3-70b,phrase control,top-1,same,0.0012894906511927789,0.0,0.004017426558336465,1551,1551
+qwen2.5-72b,match vs cross,pair,all,0.002430977600277826,0.0010721800622775356,0.003997306236873766,5759,5759
+qwen2.5-72b,match vs cross,pair,close (margin <= 0.1),0.026785714285714284,0.009227963525835867,0.0451838909034195,336,336
+qwen2.5-72b,match vs cross,pair,opposite over partial,0.024539877300613498,0.0,0.058823529411764705,163,163
+qwen2.5-72b,match vs cross,pair,opposite over same,0.0,0.0,0.0,172,172
+qwen2.5-72b,match vs cross,pair,partial over opposite,0.0006684491978609625,0.0,0.0021202539564960606,1496,1496
+qwen2.5-72b,match vs cross,pair,partial over partial,0.004484304932735426,0.0,0.013761467889908258,223,223
+qwen2.5-72b,match vs cross,pair,partial over same,0.008379888268156424,0.0,0.018325207742927133,358,358
+qwen2.5-72b,match vs cross,pair,same over opposite,0.0,0.0,0.0,1526,1526
+qwen2.5-72b,match vs cross,pair,same over partial,0.0027457440966501922,0.0,0.006401550888529886,1821,1821
+qwen2.5-72b,match vs cross,top-1,all,0.006349206349206349,0.002571491559586798,0.011182854896127753,1890,1890
+qwen2.5-72b,match vs cross,top-1,close (margin <= 0.1),0.030821917808219176,0.011988184438040346,0.05576245205053392,292,292
+qwen2.5-72b,match vs cross,top-1,opposite,0.025,0.0,0.056962025316455694,160,160
+qwen2.5-72b,match vs cross,top-1,partial,0.015463917525773196,0.0,0.03614457831325301,194,194
+qwen2.5-72b,match vs cross,top-1,same,0.0032552083333333335,0.0,0.007984868455508807,1536,1536
+qwen2.5-72b,cross vs match,pair,all,0.0013891300573016148,0.0001826434032385851,0.0029337468711531675,5759,5759
+qwen2.5-72b,cross vs match,pair,close (margin <= 0.1),0.011904761904761904,0.0,0.02631578947368421,336,336
+qwen2.5-72b,cross vs match,pair,opposite over partial,0.006134969325153374,0.0,0.02013762923997823,163,163
+qwen2.5-72b,cross vs match,pair,opposite over same,0.005813953488372093,0.0,0.017241379310344827,172,172
+qwen2.5-72b,cross vs match,pair,partial over opposite,0.0,0.0,0.0,1496,1496
+qwen2.5-72b,cross vs match,pair,partial over partial,0.013452914798206279,0.0,0.04167151162790697,223,223
+qwen2.5-72b,cross vs match,pair,partial over same,0.002793296089385475,0.0,0.009858436582574508,358,358
+qwen2.5-72b,cross vs match,pair,same over opposite,0.0,0.0,0.0,1526,1526
+qwen2.5-72b,cross vs match,pair,same over partial,0.001098297638660077,0.0,0.0027149979764267075,1821,1821
+qwen2.5-72b,cross vs match,top-1,all,0.0021164021164021165,0.0,0.0048602707874575235,1890,1890
+qwen2.5-72b,cross vs match,top-1,close (margin <= 0.1),0.00684931506849315,0.0,0.016502332051386955,292,292
+qwen2.5-72b,cross vs match,top-1,opposite,0.00625,0.0,0.019233870967741935,160,160
+qwen2.5-72b,cross vs match,top-1,partial,0.005154639175257732,0.0,0.02,194,194
+qwen2.5-72b,cross vs match,top-1,same,0.0013020833333333333,0.0,0.003264568708364046,1536,1536
+qwen2.5-72b,match vs neutral,pair,all,0.0005209237714881056,0.0,0.0011513774637165683,5759,5759
+qwen2.5-72b,match vs neutral,pair,close (margin <= 0.1),0.0,0.0,0.0,336,336
+qwen2.5-72b,match vs neutral,pair,opposite over partial,0.0,0.0,0.0,163,163
+qwen2.5-72b,match vs neutral,pair,opposite over same,0.0,0.0,0.0,172,172
+qwen2.5-72b,match vs neutral,pair,partial over opposite,0.0006684491978609625,0.0,0.002579106253030053,1496,1496
+qwen2.5-72b,match vs neutral,pair,partial over partial,0.004484304932735426,0.0,0.014152620048287578,223,223
+qwen2.5-72b,match vs neutral,pair,partial over same,0.002793296089385475,0.0,0.008405741900159495,358,358
+qwen2.5-72b,match vs neutral,pair,same over opposite,0.0,0.0,0.0,1526,1526
+qwen2.5-72b,match vs neutral,pair,same over partial,0.0,0.0,0.0,1821,1821
+qwen2.5-72b,match vs neutral,top-1,all,0.0005291005291005291,0.0,0.0016201123790596478,1890,1890
+qwen2.5-72b,match vs neutral,top-1,close (margin <= 0.1),0.0,0.0,0.0,292,292
+qwen2.5-72b,match vs neutral,top-1,opposite,0.0,0.0,0.0,160,160
+qwen2.5-72b,match vs neutral,top-1,partial,0.005154639175257732,0.0,0.016133969716919022,194,194
+qwen2.5-72b,match vs neutral,top-1,same,0.0,0.0,0.0,1536,1536
+qwen2.5-72b,phrase control,pair,all,0.0013869625520110957,0.0001762904275902543,0.0030970406056434964,5768,5768
+qwen2.5-72b,phrase control,pair,close (margin <= 0.1),0.0,0.0,0.0,345,345
+qwen2.5-72b,phrase control,pair,opposite over partial,0.0,0.0,0.0,157,157
+qwen2.5-72b,phrase control,pair,opposite over same,0.0,0.0,0.0,171,171
+qwen2.5-72b,phrase control,pair,partial over opposite,0.002,0.0,0.005242894798293527,1500,1500
+qwen2.5-72b,phrase control,pair,partial over partial,0.0,0.0,0.0,220,220
+qwen2.5-72b,phrase control,pair,partial over same,0.005479452054794521,0.0,0.017649669335189695,365,365
+qwen2.5-72b,phrase control,pair,same over opposite,0.0013080444735120995,0.0,0.004138073918841684,1529,1529
+qwen2.5-72b,phrase control,pair,same over partial,0.000547645125958379,0.0,0.0016519823788546256,1826,1826
+qwen2.5-72b,phrase control,top-1,all,0.0015789473684210526,0.0,0.004102722136620441,1900,1900
+qwen2.5-72b,phrase control,top-1,close (margin <= 0.1),0.0,0.0,0.0,305,305
+qwen2.5-72b,phrase control,top-1,opposite,0.0,0.0,0.0,156,156
+qwen2.5-72b,phrase control,top-1,partial,0.009900990099009901,0.0,0.02963146314631463,202,202
+qwen2.5-72b,phrase control,top-1,same,0.0006485084306095979,0.0,0.0020231663459588066,1542,1542
+mistral-24b,match vs cross,pair,all,0.001865038996269922,0.0005399156260572903,0.003364786710443944,5898,5898
+mistral-24b,match vs cross,pair,close (margin <= 0.1),0.026041666666666668,0.0058823529411764705,0.04736904464953854,192,192
+mistral-24b,match vs cross,pair,opposite over partial,0.027932960893854747,0.0,0.06220843301435406,179,179
+mistral-24b,match vs cross,pair,opposite over same,0.004651162790697674,0.0,0.015155869035179376,215,215
+mistral-24b,match vs cross,pair,partial over opposite,0.0,0.0,0.0,1532,1532
+mistral-24b,match vs cross,pair,partial over partial,0.008064516129032258,0.0,0.022938422187460363,248,248
+mistral-24b,match vs cross,pair,partial over same,0.005333333333333333,0.0,0.012542161025356133,375,375
+mistral-24b,match vs cross,pair,same over opposite,0.0,0.0,0.0,1500,1500
+mistral-24b,match vs cross,pair,same over partial,0.0005408328826392645,0.0,0.0017043908527351877,1849,1849
+mistral-24b,match vs cross,top-1,all,0.004158004158004158,0.0010229526593245994,0.008495785299065814,1924,1924
+mistral-24b,match vs cross,top-1,close (margin <= 0.1),0.04,0.0,0.1,75,75
+mistral-24b,match vs cross,top-1,opposite,0.027932960893854747,0.0,0.06742936620486527,179,179
+mistral-24b,match vs cross,top-1,partial,0.010869565217391304,0.0,0.03296930342384888,184,184
+mistral-24b,match vs cross,top-1,same,0.0006406149903907751,0.0,0.00207089834873504,1561,1561
+mistral-24b,cross vs match,pair,all,0.00084774499830451,0.0,0.0018368313274045504,5898,5898
+mistral-24b,cross vs match,pair,close (margin <= 0.1),0.010416666666666666,0.0,0.027401983939537074,192,192
+mistral-24b,cross vs match,pair,opposite over partial,0.0,0.0,0.0,179,179
+mistral-24b,cross vs match,pair,opposite over same,0.009302325581395349,0.0,0.02336448598130841,215,215
+mistral-24b,cross vs match,pair,partial over opposite,0.0,0.0,0.0,1532,1532
+mistral-24b,cross vs match,pair,partial over partial,0.0,0.0,0.0,248,248
+mistral-24b,cross vs match,pair,partial over same,0.0,0.0,0.0,375,375
+mistral-24b,cross vs match,pair,same over opposite,0.0006666666666666666,0.0,0.002125216216051798,1500,1500
+mistral-24b,cross vs match,pair,same over partial,0.001081665765278529,0.0,0.0034598516826085243,1849,1849
+mistral-24b,cross vs match,top-1,all,0.0010395010395010396,0.0,0.0031779661016949155,1924,1924
+mistral-24b,cross vs match,top-1,close (margin <= 0.1),0.013333333333333334,0.0,0.04838709677419355,75,75
+mistral-24b,cross vs match,top-1,opposite,0.0,0.0,0.0,179,179
+mistral-24b,cross vs match,top-1,partial,0.0,0.0,0.0,184,184
+mistral-24b,cross vs match,top-1,same,0.0012812299807815502,0.0,0.004059746336093208,1561,1561
+mistral-24b,match vs neutral,pair,all,0.00016954899966090201,0.0,0.0005258591239169753,5898,5898
+mistral-24b,match vs neutral,pair,close (margin <= 0.1),0.005208333333333333,0.0,0.01765231092436974,192,192
+mistral-24b,match vs neutral,pair,opposite over partial,0.0,0.0,0.0,179,179
+mistral-24b,match vs neutral,pair,opposite over same,0.0,0.0,0.0,215,215
+mistral-24b,match vs neutral,pair,partial over opposite,0.0,0.0,0.0,1532,1532
+mistral-24b,match vs neutral,pair,partial over partial,0.0,0.0,0.0,248,248
+mistral-24b,match vs neutral,pair,partial over same,0.0026666666666666666,0.0,0.008523944805194804,375,375
+mistral-24b,match vs neutral,pair,same over opposite,0.0,0.0,0.0,1500,1500
+mistral-24b,match vs neutral,pair,same over partial,0.0,0.0,0.0,1849,1849
+mistral-24b,match vs neutral,top-1,all,0.0005197505197505198,0.0,0.0016008965465342199,1924,1924
+mistral-24b,match vs neutral,top-1,close (margin <= 0.1),0.013333333333333334,0.0,0.04918032786885246,75,75
+mistral-24b,match vs neutral,top-1,opposite,0.0,0.0,0.0,179,179
+mistral-24b,match vs neutral,top-1,partial,0.005434782608695652,0.0,0.021138159894619504,184,184
+mistral-24b,match vs neutral,top-1,same,0.0,0.0,0.0,1561,1561
+mistral-24b,phrase control,pair,all,0.00033938571186153065,0.0,0.0010368066355624676,5893,5893
+mistral-24b,phrase control,pair,close (margin <= 0.1),0.0,0.0,0.0,165,165
+mistral-24b,phrase control,pair,opposite over partial,0.0,0.0,0.0,173,173
+mistral-24b,phrase control,pair,opposite over same,0.0,0.0,0.0,221,221
+mistral-24b,phrase control,pair,partial over opposite,0.0,0.0,0.0,1532,1532
+mistral-24b,phrase control,pair,partial over partial,0.008064516129032258,0.0,0.02564935064935064,248,248
+mistral-24b,phrase control,pair,partial over same,0.0,0.0,0.0,388,388
+mistral-24b,phrase control,pair,same over opposite,0.0,0.0,0.0,1491,1491
+mistral-24b,phrase control,pair,same over partial,0.0,0.0,0.0,1840,1840
+mistral-24b,phrase control,top-1,all,0.0,0.0,0.0,1918,1918
+mistral-24b,phrase control,top-1,close (margin <= 0.1),0.0,0.0,0.0,72,72
+mistral-24b,phrase control,top-1,opposite,0.0,0.0,0.0,173,173
+mistral-24b,phrase control,top-1,partial,0.0,0.0,0.0,192,192
+mistral-24b,phrase control,top-1,same,0.0,0.0,0.0,1553,1553

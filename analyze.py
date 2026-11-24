@@ -50,18 +50,34 @@ Output, in {out_dir} (default analysis/{name of results_dir}/):
                              each judge's gap, how many judges agree on its sign, and the unsigned mad
   situation_agreement.csv    Spearman correlation of the per-situation gaps between judges
   top_situations.png/.pdf    the --top situations of top_situations.csv
+  top_situations_max.csv/.png      the same, ranked by the largest |gap| of any judge (judge_of_max says whose)
+  model_specific_top_situations/top_situations_{judge}.csv/.png  the same, ranked by that judge's |gap|,
+                             plotted for that judge only
   topics.csv                 judge x grouping (topic domain, subdomain) x topic x measure (each signed gap,
                              levels/cue mad): mean and CI over the topic's situations, n_situations
   topic_heterogeneity.csv    judge x grouping x measure: do the topics differ more than random groups of
                              situations? eta2 (between-topic share of the variance of the situation values),
                              its value under no topic effect, (G - 1) / (N - 1), and a permutation p-value
   topics_{domain,subdomain}.png/.pdf  the signed gaps by topic (groups of >= --min_situations situations)
-The topics need the topic columns of topics.py in the scores.
+The topics need the topic columns of topics.py in the scores. Groupings: selection_topic, expected_authority,
+topic_domain, topic_subdomain, those present with >= 2 values.
+  stances.csv                judge x grouping (reference stance, stance pair ref -> cand, stance match) x group x
+                             measure: mean and CI over the situations (CSV column `topic` = the group)
+  stance_heterogeneity.csv   do the stance groups differ? eta2 of the item means vs stances shuffled within situations
+  stances_{reference,pair,match}.png/.pdf  the signed gaps by stance group
+  model_specific_top_situations_by_stance/top_situations_{judge}_by_{match,pair}.csv/.png  each judge's top
+                             situations (ranked as in model_specific_top_situations), with the gap of each stance
+                             group (match: same/partial/opposite; pair: the 9 ref -> cand stances) side by side,
+                             each from the situation's items in that group only (n {group} = its references there)
+Stereotype congruence (signed gap "congruent - incongruent", see STEREOTYPE_COLUMNS): expected level - the other,
+with the stereotype's groups weighted equally, = ((f - m | W) - (f - m | M)) / 2 for gender.
 
 Usage:
     python analyze.py scores/reference_gender
     python analyze.py scores/reference_gender --out_dir analysis/pilot --n_boot 2000
     python analyze.py scores/reference_gender --relative     # -> *_relative.{csv,png,pdf}
+    python analyze.py scores/hb_reference_gender scores/vp_reference_gender --out_dir analysis/joint/reference_gender
+                                                             # joint: the datasets pooled, + a "dataset" grouping
 """
 import argparse
 import textwrap
@@ -83,6 +99,14 @@ from score import ORIGINAL_LEVEL  # noqa: E402
 ANALYSIS_DIR = Path(__file__).resolve().parent / "analysis"
 ITEM_KEYS = ["reference_original_text_id", "candidate_original_text_id"]
 
+# Stereotype congruence: per variable, the situation column saying which level the stereotype expects
+# (e.g. who is expected to have more authority on the topic) and its values -> levels. Gives the signed
+# contrast CONGRUENT = expected level - the other level (only with exactly two non-neutral levels), pooled
+# with the expected levels weighted equally: then a gap shared by all the situations (e.g. female > male
+# everywhere) cancels out, and CONGRUENT = ((f - m | W) - (f - m | M)) / 2 for gender.
+STEREOTYPE_COLUMNS = {"gender": ("expected_authority", {"M": "male", "W": "female"})}
+CONGRUENT = "congruent - incongruent"
+
 # Judges keep their color and marker whatever subset is plotted: slots in the order of
 # judges.REGISTRY (then OpenRouter judges, alphabetically). Categorical palette of the dataviz
 # reference (light mode); the marker is the secondary encoding past 3 judges.
@@ -93,8 +117,10 @@ INK, INK_2, INK_MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#8a8984", "#e4e3df
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("results_dir", type=Path, help="A directory of score.py, e.g. scores/reference_gender.")
-    parser.add_argument("--out_dir", type=Path, default=None, help="Default: analysis/{results_dir name}.")
+    parser.add_argument("results_dirs", type=Path, nargs="+",
+                        help="Directories of score.py, e.g. scores/hb_reference_gender; several (e.g. the hb and vp "
+                             "ones of a setup) are analysed jointly.")
+    parser.add_argument("--out_dir", type=Path, default=None, help="Default: analysis/{run_name}.")
     parser.add_argument("--judges", nargs="+", default=None, help="Only these judges (default: every file).")
     parser.add_argument("--n_boot", type=int, default=1000, help="Bootstrap resamples of the situations.")
     parser.add_argument("--seed", type=int, default=0)
@@ -110,17 +136,45 @@ def parse_args():
 # ---------------------------------------------------------------------------------------------
 # Loading
 
-def load(results_dir, judges=None):
+def as_dirs(results_dirs):
+    return [results_dirs] if isinstance(results_dirs, (str, Path)) else list(results_dirs)
+
+
+def run_name(results_dirs):
+    """The name of one directory, or of several sharing a setup: hb_reference_gender + vp_reference_gender
+    -> hb+vp_reference_gender."""
+    names = [Path(d).resolve().name for d in as_dirs(results_dirs)]
+    if len(names) == 1:
+        return names[0]
+    prefixes, setups = zip(*(n.split("_", 1) if "_" in n else (n, "") for n in names))
+    return f"{'+'.join(prefixes)}_{setups[0]}" if len(set(setups)) == 1 else "+".join(names)
+
+
+def default_out_dir(name):
+    """analysis/<dataset>/<setup>: hb_reference_gender -> analysis/hb/reference_gender, hb+vp_... ->
+    analysis/joint/..."""
+    prefix, _, setup = name.partition("_")
+    if prefix in ("hb", "vp"):
+        return ANALYSIS_DIR / prefix / setup
+    if set(prefix.split("+")) == {"hb", "vp"}:
+        return ANALYSIS_DIR / "joint" / setup
+    return ANALYSIS_DIR / name
+
+
+def load(results_dirs, judges=None):
+    """The *_by_prompt.csv of one or more directories (the datasets of a joint analysis: columns one of them
+    lacks are NaN for its rows)."""
     frames = []
-    for path in sorted(results_dir.glob("*_by_prompt.csv")):
-        judge = path.name.removesuffix("_by_prompt.csv")
-        if judges and judge not in judges:
-            continue
-        df = pd.read_csv(path)
-        df["judge"] = judge
-        frames.append(df)
+    for results_dir in as_dirs(results_dirs):
+        for path in sorted(Path(results_dir).glob("*_by_prompt.csv")):
+            judge = path.name.removesuffix("_by_prompt.csv")
+            if judges and judge not in judges:
+                continue
+            df = pd.read_csv(path, low_memory=False)
+            df["judge"] = judge
+            frames.append(df)
     if not frames:
-        raise SystemExit(f"No *_by_prompt.csv in {results_dir}")
+        raise SystemExit(f"No *_by_prompt.csv in {results_dirs}")
     df = pd.concat(frames, ignore_index=True)
 
     # The level of a version: of the intervened side, or of both sides ("ref|cand").
@@ -169,8 +223,9 @@ def pairwise(wide):
     return pd.DataFrame({"mad": mad, "changed": changed}, index=wide.index)
 
 
-def cluster_bootstrap(values, clusters, n_boot, rng, denominators=None):
-    """Mean of `values` and the 95% CI of a bootstrap that resamples whole clusters.
+def bootstrap_draws(values, clusters, n_boot, rng, denominators=None):
+    """Mean of `values`, the bootstrap distribution of that mean (resampling whole clusters) and the
+    number of observations.
 
     With `denominators`, a relative mean: each cluster's mean value divided by its mean denominator (e.g.
     a situation's mean gap / its mean neutral score), then the unweighted mean of those cluster ratios.
@@ -181,25 +236,54 @@ def cluster_bootstrap(values, clusters, n_boot, rng, denominators=None):
     ok = ~np.isnan(values) & ~np.isnan(denominators)
     values, denominators, clusters = values[ok], denominators[ok], np.asarray(clusters)[ok]
     if len(values) == 0:
-        return np.nan, np.nan, np.nan, 0
+        return np.nan, None, 0
     codes, uniques = pd.factorize(clusters)
     sums = np.bincount(codes, weights=values, minlength=len(uniques))
     den_sums = np.bincount(codes, weights=denominators, minlength=len(uniques))
     if relative:
         ratios = sums[den_sums != 0] / den_sums[den_sums != 0]
         weights = rng.multinomial(len(ratios), np.full(len(ratios), 1 / len(ratios)), size=n_boot)
-        boot = weights @ ratios / len(ratios)
-        mean = ratios.mean()
-    else:
-        weights = rng.multinomial(len(uniques), np.full(len(uniques), 1 / len(uniques)), size=n_boot)
-        boot = (weights @ sums) / (weights @ den_sums)
-        mean = values.mean()
+        return ratios.mean(), weights @ ratios / len(ratios), len(values)
+    weights = rng.multinomial(len(uniques), np.full(len(uniques), 1 / len(uniques)), size=n_boot)
+    return values.mean(), (weights @ sums) / (weights @ den_sums), len(values)
+
+
+def cluster_bootstrap(values, clusters, n_boot, rng, denominators=None):
+    """Mean of `values` and the 95% CI of a bootstrap that resamples whole clusters (see bootstrap_draws)."""
+    mean, boot, n = bootstrap_draws(values, clusters, n_boot, rng, denominators)
+    if boot is None:
+        return np.nan, np.nan, np.nan, 0
     lo, hi = np.percentile(boot, [2.5, 97.5])
-    return mean, lo, hi, len(values)
+    return mean, lo, hi, n
 
 
-def summarize(values, clusters, n_boot, rng, denominators=None, **keys):
-    mean, lo, hi, n = cluster_bootstrap(values, clusters, n_boot, rng, denominators)
+def stratified_bootstrap(values, clusters, strata, n_boot, rng, denominators=None):
+    """The unweighted mean over the strata of each stratum's mean (e.g. M- and W-authority situations weigh
+    the same, whatever their numbers), with the 95% CI of a bootstrap resampling the clusters within each
+    stratum. Observations with no stratum are left out."""
+    values = np.asarray(values, dtype=float)
+    strata = np.asarray(strata, dtype=object)
+    has = pd.notna(strata)
+    means, boots, n = [], [], 0
+    for stratum in pd.unique(strata[has]):
+        mask = has & (strata == stratum)
+        mean, boot, k = bootstrap_draws(values[mask], np.asarray(clusters)[mask], n_boot, rng,
+                                        None if denominators is None else np.asarray(denominators)[mask])
+        if boot is not None:
+            means.append(mean)
+            boots.append(boot)
+            n += k
+    if not means:
+        return np.nan, np.nan, np.nan, 0
+    lo, hi = np.percentile(np.mean(boots, axis=0), [2.5, 97.5])
+    return np.mean(means), lo, hi, n
+
+
+def summarize(values, clusters, n_boot, rng, denominators=None, strata=None, **keys):
+    if strata is None:
+        mean, lo, hi, n = cluster_bootstrap(values, clusters, n_boot, rng, denominators)
+    else:
+        mean, lo, hi, n = stratified_bootstrap(values, clusters, strata, n_boot, rng, denominators)
     return {**keys, "mean": mean, "ci_low": lo, "ci_high": hi, "n": n}
 
 
@@ -225,22 +309,27 @@ def analyze_judge(df, variable, n_boot, rng, relative=False):
     situations = by_level.index.get_level_values("situation_id")
     prompts = by_level.index.get_level_values("prompt_variation")
 
-    signed, unsigned = level_measures(by_level, levels, relative)
+    signed, unsigned = level_measures(by_level, levels, relative, expected_levels(df, variable))
 
     # Unsigned: levels (female vs male) and cue (each level vs neutral), prompt fixed.
     for name, (values, base) in unsigned.items():
         factor, metric = name.split(" ")
         variation.append(summarize(values, situations, n_boot, rng, base, judge=judge, factor=factor, metric=metric))
 
-    # Signed gaps, pooled and by prompt variation.
+    # Signed gaps, pooled and by prompt variation. The congruence contrast weighs the stereotype's
+    # levels the same (stratified bootstrap), so that a gap shared by all the situations cancels out.
+    expected = expected_levels(df, variable)
+    strata_all = None if expected is None else expected.reindex(situations).to_numpy()
     for name, (gap, base) in signed.items():
-        gaps.append(summarize(gap, situations, n_boot, rng, base,
+        strata = strata_all if name == CONGRUENT else None
+        gaps.append(summarize(gap, situations, n_boot, rng, base, strata,
                               judge=judge, contrast=name, prompt_variation="all"))
         for pv in SCORING_PROMPTS:
             mask = np.asarray(prompts == pv)
             if mask.any():
                 gaps.append(summarize(gap[mask], situations[mask], n_boot, rng,
                                       None if base is None else base[mask],
+                                      None if strata is None else strata[mask],
                                       judge=judge, contrast=name, prompt_variation=pv))
     # Gaps first, then the unsigned measures (the order of the per-situation table).
     measures = {**signed, **unsigned}
@@ -255,12 +344,21 @@ def level_table(df):
                           columns="level", values="score", aggfunc="first")
 
 
-def level_measures(by_level, levels, relative):
+def expected_levels(df, variable):
+    """The level the stereotype expects in each situation (Series by situation_id), or None."""
+    if variable not in STEREOTYPE_COLUMNS or STEREOTYPE_COLUMNS[variable][0] not in df:
+        return None
+    column, mapping = STEREOTYPE_COLUMNS[variable]
+    return df.drop_duplicates("situation_id").set_index("situation_id")[column].map(mapping)
+
+
+def level_measures(by_level, levels, relative, expected=None):
     """The per-observation measures of the levels, as (signed, unsigned): dicts measure -> (values, baseline),
     the baseline being None in absolute mode or for `changed` (already scale-free).
 
     signed    each level - neutral and each pair of levels (female - male); baseline: the neutral score
-              (or, with no neutral level, the subtracted level's)
+              (or, with no neutral level, the subtracted level's). With `expected` (the stereotype's level
+              of each situation) and two levels, also CONGRUENT: expected level - the other one
     unsigned  "levels mad/changed" across the non-neutral levels, "cue mad/changed" each level vs neutral
               averaged over the levels; baseline: the mean of the compared scores"""
     has_neutral = NEUTRAL_LEVEL in by_level.columns
@@ -286,13 +384,31 @@ def level_measures(by_level, levels, relative):
     for name, (a, b) in contrasts.items():
         base = by_level[NEUTRAL_LEVEL] if has_neutral else by_level[b]
         signed[name] = (by_level[a] - by_level[b], denominator("gap", base))
+    if expected is not None and len(levels) == 2 and expected.notna().any():
+        a, b = levels
+        exp = expected.reindex(by_level.index.get_level_values("situation_id")).to_numpy()
+        sign = np.where(exp == a, 1.0, np.where(exp == b, -1.0, np.nan))
+        base = by_level[NEUTRAL_LEVEL] if has_neutral else by_level[b]
+        signed[CONGRUENT] = ((by_level[a] - by_level[b]) * sign, denominator("gap", base))
     return signed, unsigned
 
 
 # ---------------------------------------------------------------------------------------------
 # Topics
 
-TOPIC_GROUPINGS = {"domain": "topic_domain", "subdomain": "topic_subdomain"}
+# Grouping name -> situation column. Only those present with >= 2 values are used: the manual selection
+# (selection_topic, expected_authority) and the Habermas taxonomy (topic_domain, topic_subdomain).
+# "dataset" only appears in joint analyses (hb + vp).
+TOPIC_GROUPINGS = {"selection": "selection_topic", "authority": "expected_authority",
+                   "domain": "topic_domain", "subdomain": "topic_subdomain", "dataset": "dataset"}
+
+
+def available_groupings(df):
+    """The groupings whose column is known for every situation (not, in a joint analysis, the topic columns
+    of a single dataset) and has >= 2 values."""
+    situations = df.drop_duplicates("situation_id")
+    return {g: c for g, c in TOPIC_GROUPINGS.items()
+            if c in df and situations[c].notna().all() and situations[c].nunique() >= 2}
 
 
 def situation_values(values, baseline, situations):
@@ -324,20 +440,28 @@ def heterogeneity(per_situation_values, groups, n_perm, rng):
             "n_groups": len(uniques), "n_situations": len(values)}
 
 
-def analyze_topics(df, variable, n_boot, n_perm, rng, relative=False):
-    """Every signed gap and unsigned mad by topic domain and subdomain (mean and bootstrap CI over the
+def analyze_topics(df, variable, groupings, n_boot, n_perm, rng, relative=False):
+    """Every signed gap and unsigned mad by each grouping of the situations (mean and bootstrap CI over the
     situations of the group, absolute or relative as in the pooled analysis), and a permutation test of
     whether they differ between the groups."""
-    judge = df["judge"].iloc[0]
     levels = ordered_levels(df["level"].unique(), variable)
     by_level = level_table(df)
-    situations = by_level.index.get_level_values("situation_id")
     signed, unsigned = level_measures(by_level, levels, relative)
+    # Not the congruence contrast: within a stereotype group it is +-(female - male), and between groups
+    # it differs by construction.
     measures = {**signed, **{m: v for m, v in unsigned.items() if m.endswith("mad")}}
+    return topic_breakdown(df, by_level, measures, groupings, n_boot, n_perm, rng)
+
+
+def topic_breakdown(df, by_level, measures, groupings, n_boot, n_perm, rng):
+    """`measures` (name -> (per-observation values of by_level, baseline or None)) by each situation grouping:
+    mean and CI over the group's situations, and the heterogeneity test of the groups."""
+    judge = df["judge"].iloc[0]
+    situations = by_level.index.get_level_values("situation_id")
     topic_of = df.drop_duplicates("situation_id").set_index("situation_id")
 
     rows, tests = [], []
-    for grouping, column in TOPIC_GROUPINGS.items():
+    for grouping, column in groupings.items():
         groups = topic_of[column].reindex(situations).to_numpy()
         situation_group = topic_of[column]
         for measure, (values, base) in measures.items():
@@ -353,6 +477,147 @@ def analyze_topics(df, variable, n_boot, n_perm, rng, relative=False):
             tests.append({"judge": judge, "grouping": grouping, "measure": measure,
                           **heterogeneity(per_sit, situation_group.reindex(per_sit.index), n_perm, rng)})
     return rows, tests
+
+
+# ---------------------------------------------------------------------------------------------
+# Stances
+
+STANCES = ["agree", "neutral", "disagree"]
+STANCE_COLUMNS = ["reference_stance_group", "candidate_stance_group"]
+
+
+def stance_match(reference, candidate):
+    """same (agree-agree, ...), opposite (agree-disagree), partial (one of the two neutral)."""
+    reference, candidate = np.asarray(reference, dtype=object), np.asarray(candidate, dtype=object)
+    return np.where(reference == candidate, "same",
+                    np.where((reference == "neutral") | (candidate == "neutral"), "partial", "opposite"))
+
+
+# Grouping name -> (labels from the reference and candidate stances, order of the groups).
+STANCE_GROUPINGS = {
+    "reference": (lambda r, c: np.asarray(r, dtype=object), STANCES),
+    "pair": (lambda r, c: np.char.add(np.char.add(np.asarray(r, dtype=str), " -> "), np.asarray(c, dtype=str)),
+             [f"{r} -> {c}" for r in STANCES for c in STANCES]),
+    "match": (stance_match, ["same", "partial", "opposite"]),
+}
+
+
+def within_permutation(clusters, rng):
+    """Indices that shuffle the elements of an array within each cluster."""
+    codes = pd.factorize(np.asarray(clusters))[0]
+    base = np.argsort(codes, kind="stable")
+    shuffled = np.lexsort((rng.random(len(codes)), codes))
+    perm = np.empty(len(codes), dtype=int)
+    perm[base] = shuffled
+    return perm
+
+
+def analyze_stances(df, variable, n_boot, n_perm, rng, relative=False):
+    """Every signed gap (with the congruence contrast) and unsigned mad by the stance of the reference, by the
+    pair of stances (reference -> candidate) and by their match: mean and CI by bootstrap over the
+    situations, absolute or relative as in the pooled analysis.
+
+    The stances vary within the situations, so the test of whether the groups differ (absolute values only)
+    keeps the situations: unit = item (reference x candidate, mean over the prompts), statistic = eta2
+    between the groups, null = the stances of the references, and of the candidates, shuffled within each
+    situation (situation effects and composition, e.g. M/W authority, stay the same)."""
+    levels = ordered_levels(df["level"].unique(), variable)
+    by_level = level_table(df)
+    situations = by_level.index.get_level_values("situation_id")
+    expected = expected_levels(df, variable)
+    signed, unsigned = level_measures(by_level, levels, relative, expected)
+    measures = {**signed, **{m: v for m, v in unsigned.items() if m.endswith("mad")}}
+    strata = {} if expected is None else {CONGRUENT: expected.reindex(situations).to_numpy()}
+    return stance_breakdown(df, by_level, measures, n_boot, n_perm, rng, relative, strata)
+
+
+def stance_breakdown(df, by_level, measures, n_boot, n_perm, rng, relative=False, strata=None):
+    """`measures` (name -> (per-observation values of by_level, baseline or None)) by the stance groupings, with
+    the within-situation permutation test (absolute mode only; see analyze_stances). `strata`: measure ->
+    per-observation stratum, for the measures pooled over strata with equal weights (stratified bootstrap)."""
+    judge = df["judge"].iloc[0]
+    situations = by_level.index.get_level_values("situation_id")
+    strata = strata or {}
+
+    stance_of = df.drop_duplicates("item").set_index("item")[STANCE_COLUMNS]
+    items = by_level.index.get_level_values("item")
+    ref_stance = stance_of["reference_stance_group"].reindex(items).to_numpy()
+    cand_stance = stance_of["candidate_stance_group"].reindex(items).to_numpy()
+
+    # Items for the test: their situation, reference, candidate, stances, and mean value of each measure.
+    unit = pd.DataFrame({m: np.asarray(v, dtype=float) for m, (v, _) in measures.items()},
+                        index=by_level.index).groupby(level=["situation_id", "reference_original_text_id",
+                                                             "item"]).mean()
+    unit_items = unit.index.get_level_values("item")
+    unit_sit = unit.index.get_level_values("situation_id").to_numpy()
+    unit_ref = unit.index.get_level_values("reference_original_text_id").to_numpy()
+    unit_cand = df.drop_duplicates("item").set_index("item")["candidate_original_text_id"].reindex(unit_items)
+    unit_ref_stance = stance_of["reference_stance_group"].reindex(unit_items).to_numpy()
+    unit_cand_stance = stance_of["candidate_stance_group"].reindex(unit_items).to_numpy()
+    # One permutation draws new stances for the references and candidates of each situation.
+    refs = pd.DataFrame({"sit": unit_sit, "ref": unit_ref, "stance": unit_ref_stance}).drop_duplicates("ref")
+    cands = pd.DataFrame({"sit": unit_sit, "cand": unit_cand.to_numpy(), "stance": unit_cand_stance}
+                         ).drop_duplicates(["sit", "cand"])
+    ref_pos = pd.Index(refs["ref"]).get_indexer(unit_ref)
+    cand_pos = pd.MultiIndex.from_frame(cands[["sit", "cand"]]).get_indexer(
+        pd.MultiIndex.from_arrays([unit_sit, unit_cand.to_numpy()]))
+    perms = [(refs["stance"].to_numpy()[within_permutation(refs["sit"], rng)][ref_pos],
+              cands["stance"].to_numpy()[within_permutation(cands["sit"], rng)][cand_pos]) for _ in range(n_perm)]
+
+    def eta2(values, labels):
+        codes, uniques = pd.factorize(labels)
+        counts = np.bincount(codes, minlength=len(uniques))
+        means = np.bincount(codes, weights=values, minlength=len(uniques)) / counts
+        return (counts * (means - values.mean()) ** 2).sum() / ((values - values.mean()) ** 2).sum()
+
+    rows, tests = [], []
+    for grouping, (label_of, order) in STANCE_GROUPINGS.items():
+        groups = label_of(ref_stance, cand_stance)
+        for measure, (values, base) in measures.items():
+            values = np.asarray(values, dtype=float)
+            base = None if base is None else np.asarray(base, dtype=float)
+            for group in [g for g in order if (groups == g).any()]:
+                mask = groups == group
+                rows.append({**summarize(values[mask], situations[mask], n_boot, rng,
+                                         None if base is None else base[mask],
+                                         strata[measure][mask] if measure in strata else None,
+                                         judge=judge, grouping=grouping, topic=group, measure=measure),
+                             "n_situations": pd.unique(situations[mask]).size})
+            if relative:
+                continue
+            y = unit[measure].to_numpy()
+            ok = ~np.isnan(y)
+            observed = eta2(y[ok], label_of(unit_ref_stance, unit_cand_stance)[ok])
+            null = np.array([eta2(y[ok], label_of(r, c)[ok]) for r, c in perms])
+            tests.append({"judge": judge, "grouping": grouping, "measure": measure, "eta2": observed,
+                          "eta2_null_mean": null.mean(), "p_value": (1 + (null >= observed).sum()) / (1 + n_perm),
+                          "n_groups": len(pd.unique(label_of(unit_ref_stance, unit_cand_stance)[ok])),
+                          "n_items": int(ok.sum())})
+    return rows, tests
+
+
+def stance_situations(df, variable, relative=False):
+    """The signed gaps of each situation (as per_situation) within each stance group of the "match" and "pair"
+    groupings: only the situation's items whose stances fall in the group. Long format, with the columns
+    `grouping` and `group`."""
+    judge = df["judge"].iloc[0]
+    levels = ordered_levels(df["level"].unique(), variable)
+    by_level = level_table(df)
+    signed, _ = level_measures(by_level, levels, relative)
+    stance_of = df.drop_duplicates("item").set_index("item")[STANCE_COLUMNS]
+    items = by_level.index.get_level_values("item")
+    ref_stance = stance_of["reference_stance_group"].reindex(items).to_numpy()
+    cand_stance = stance_of["candidate_stance_group"].reindex(items).to_numpy()
+    frames = []
+    for grouping in ("match", "pair"):
+        label_of, order = STANCE_GROUPINGS[grouping]
+        groups = label_of(ref_stance, cand_stance)
+        for group in [g for g in order if (groups == g).any()]:
+            mask = groups == group
+            observed = pd.DataFrame({m: v[mask] for m, (v, _) in signed.items()})
+            baselines = {m: b[mask] for m, (_, b) in signed.items() if b is not None}
+            frames.append(per_situation(observed, judge, baselines).assign(grouping=grouping, group=group))
+    return pd.concat(frames, ignore_index=True) if frames else None
 
 
 def per_situation(observed, judge, baselines=None):
@@ -385,24 +650,33 @@ def per_situation(observed, judge, baselines=None):
     return out
 
 
-def top_situations(by_situation, situations_text, judges, contrast):
-    """One row per situation: the gap of `contrast` for each judge, its mean over the judges, and the
-    mean unsigned difference between the levels; sorted by the absolute mean gap over the judges."""
+def top_situations(by_situation, situations_text, judges, contrast, expected=None, rank_by="mean"):
+    """One row per situation: the gap of `contrast` for each judge, its mean over the judges, its largest
+    absolute value over the judges, and the mean unsigned difference between the levels. Sorted by
+    `rank_by`: "mean" = |mean gap over the judges|, "max" = the largest |gap| of any judge, or a judge's
+    name = that judge's |gap|. With `expected`, also the level the stereotype expects in the situation."""
     gap = by_situation[by_situation["measure"] == contrast]
     wide = gap.pivot(index="situation_id", columns="judge", values="mean").reindex(columns=judges)
     se = gap.pivot(index="situation_id", columns="judge", values="se").reindex(columns=judges)
     out = pd.DataFrame(index=wide.index)
     out["situation"] = situations_text.reindex(wide.index)
+    if expected is not None:
+        out["expected_level"] = expected.reindex(wide.index)
     out["n_references"] = gap.groupby("situation_id")["n_references"].first()
     out["gap_mean_over_judges"] = wide.mean(axis=1)
     out["n_judges_same_sign"] = (np.sign(wide).eq(np.sign(out["gap_mean_over_judges"]), axis=0)).sum(axis=1)
+    out["gap_max_abs_over_judges"] = wide.abs().max(axis=1)
+    out["judge_of_max"] = wide.abs().idxmax(axis=1)
     for judge in judges:
         out[f"gap {judge}"] = wide[judge]
         out[f"se {judge}"] = se[judge]
     unsigned = by_situation[by_situation["measure"] == "levels mad"]
     if len(unsigned):
         out["levels_mad_mean_over_judges"] = unsigned.groupby("situation_id")["mean"].mean()
-    out = out.reindex(out["gap_mean_over_judges"].abs().sort_values(ascending=False).index)
+    key = {"mean": out["gap_mean_over_judges"].abs(), "max": out["gap_max_abs_over_judges"]}.get(rank_by)
+    if key is None:
+        key = wide[rank_by].abs()
+    out = out.reindex(key.sort_values(ascending=False).index)
     out.insert(0, "rank", np.arange(1, len(out) + 1))
     return out.reset_index()
 
@@ -480,7 +754,7 @@ def gap_label(relative, baseline, sep=" "):
     return f"Mean score difference,{sep}% of the mean {baseline} score" if relative else "Mean score difference"
 
 
-def plot_gaps(gaps, judges, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL):
+def plot_gaps(gaps, judges, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL, name="signed_gaps"):
     pooled = gaps[gaps["prompt_variation"] == "all"]
     contrasts = list(dict.fromkeys(pooled["contrast"]))
     fig, axes = figure(figsize=(7, 0.9 + 0.75 * len(contrasts) * max(1, len(judges) / 3)))
@@ -505,10 +779,11 @@ def plot_gaps(gaps, judges, out_dir, title, relative=False, baseline=NEUTRAL_LEV
     legend(fig, judges, judges)
     fig.suptitle(title, fontsize=11, color=INK, y=1.1)
     fig.tight_layout()
-    save(fig, out_dir, "signed_gaps", relative)
+    save(fig, out_dir, name, relative)
 
 
-def plot_gaps_by_prompt(gaps, judges, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL):
+def plot_gaps_by_prompt(gaps, judges, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL,
+                        name="signed_gaps_by_prompt"):
     by_prompt = gaps[gaps["prompt_variation"] != "all"]
     contrasts = list(dict.fromkeys(by_prompt["contrast"]))
     prompts = [p for p in SCORING_PROMPTS if p in set(by_prompt["prompt_variation"])]
@@ -535,49 +810,154 @@ def plot_gaps_by_prompt(gaps, judges, out_dir, title, relative=False, baseline=N
     legend(fig, judges, judges)
     fig.suptitle(title, fontsize=11, color=INK, y=1.1)
     fig.tight_layout()
-    save(fig, out_dir, "signed_gaps_by_prompt", relative)
+    save(fig, out_dir, name, relative)
 
 
-def plot_top_situations(top, judges, contrast, n_top, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL):
+def plot_top_situations(top, judges, contrast, n_top, out_dir, title, relative=False, baseline=NEUTRAL_LEVEL,
+                        name="top_situations", plot_judges=None, pooled=None,
+                        pooled_label="the judge's mean gap over all the situations"):
+    """The first `n_top` rows of `top`, with the gap of each of `plot_judges` (default: all the judges; the
+    colors stay those of `judges`). No legend for a single judge (the title names it). `pooled`: judge ->
+    its mean gap over all the situations, drawn as a dotted line (labelled when a single judge is plotted)."""
     rows = top.head(n_top)
+    all_judges, judges = judges, plot_judges or judges
     fig, axes = figure(figsize=(10, 1.0 + 0.55 * len(rows) * max(1, len(judges) / 3)))
     ax = axes[0]
     setup_axes(ax)
     ax.grid(axis="y", visible=False)
     ax.axvline(0, color=INK_MUTED, linewidth=1, zorder=1)
     step = 0.6 / max(1, len(judges) - 1) if len(judges) > 1 else 0
+    for judge in judges if pooled else []:
+        if judge in pooled and np.isfinite(pooled[judge]):
+            ax.axvline(pooled[judge], color=style_of(judge, all_judges)[0], linewidth=1.2, linestyle=":", zorder=1)
+            if len(judges) == 1:
+                value = f"{pooled[judge]:+.1%}" if relative else f"{pooled[judge]:+.4f}"
+                ax.annotate(f"{judge} mean: {value}", xy=(pooled[judge], 1), xycoords=("data", "axes fraction"),
+                            xytext=(4, 2), textcoords="offset points", fontsize=8, color=INK_2, va="bottom")
     for k, judge in enumerate(judges):
-        color, marker = style_of(judge, judges)
+        color, marker = style_of(judge, all_judges)
         y = np.arange(len(rows)) + (k - (len(judges) - 1) / 2) * step
         ax.errorbar(rows[f"gap {judge}"], y, xerr=1.96 * rows[f"se {judge}"].fillna(0), fmt="none", ecolor=color,
                     elinewidth=2, capsize=0, zorder=2)
         ax.scatter(rows[f"gap {judge}"], y, color=color, marker=marker, s=40, edgecolors=SURFACE, linewidths=1.5,
                    zorder=3)
-    labels = [f"{r['rank']}. {textwrap.shorten(str(r['situation']), 70)}  (n={r['n_references']})"
+    tag = (lambda r: f"[{r['expected_level']}] ") if "expected_level" in rows else (lambda r: "")
+    labels = [f"{r['rank']}. {tag(r)}{textwrap.shorten(str(r['situation']), 70)}  (n={r['n_references']})"
               for _, r in rows.iterrows()]
     ax.set_yticks(np.arange(len(rows)), labels, fontsize=8, color=INK)
     ax.invert_yaxis()
-    what = (f"Mean {contrast} score difference in the situation, % of its mean {baseline} score" if relative
+    what = (f"Mean {contrast} score difference in the situation,\n% of its mean {baseline} score" if relative
             else f"Mean {contrast} score difference in the situation")
-    ax.set_xlabel(f"{what}\n(±1.96 SE over its references; n = references)", fontsize=9, color=INK_2)
+    dotted = f"\ndotted: {pooled_label}" if pooled else ""
+    ax.set_xlabel(f"{what}\n(±1.96 SE over its references; n = references){dotted}", fontsize=9, color=INK_2)
     if relative:
         percent_axis(ax.xaxis)
     # Fixed room (in inches) at the top for the title and the legend, whatever the figure's height.
     height = fig.get_figheight()
     fig.suptitle(title, fontsize=11, color=INK, y=1 - 0.15 / height, va="top")
-    legend(fig, judges, judges, y=1 - 0.45 / height)
-    fig.tight_layout(rect=(0, 0, 1, 1 - 0.8 / height))
-    save(fig, out_dir, "top_situations", relative)
+    if len(judges) > 1:
+        legend(fig, judges, all_judges, y=1 - 0.45 / height)
+    fig.tight_layout(rect=(0, 0, 1, 1 - (0.8 if len(judges) > 1 else 0.5) / height))
+    save(fig, out_dir, name, relative)
+
+
+STANCE_COLORS = {"agree": PALETTE[2], "neutral": PALETTE[3], "disagree": PALETTE[7]}
+STANCE_MARKERS = {"agree": "^", "neutral": "o", "disagree": "v"}
+MATCH_STYLES = {"same": (PALETTE[2], "o"), "partial": (PALETTE[3], "s"), "opposite": (PALETTE[7], "D")}
+
+
+def stance_group_style(group):
+    """match groups: a color each; pair groups (ref -> cand): the candidate stance's color and marker (the
+    reference stance is the panel)."""
+    if group in MATCH_STYLES:
+        return MATCH_STYLES[group]
+    candidate = group.split(" -> ")[1]
+    return STANCE_COLORS[candidate], STANCE_MARKERS[candidate]
+
+
+def stance_top_table(ranked, by_stance, judge, order):
+    """The situations of `ranked` (a judge's top situations, in its order) with, for each stance group, the
+    judge's gap, SE and number of references in that group (wide: "gap {group}", "se {group}", "n {group}")."""
+    keep = ["situation_id", "rank", "situation"] + (["expected_level"] if "expected_level" in ranked else [])
+    out = ranked[keep + ["n_references", f"gap {judge}", f"se {judge}"]].rename(
+        columns={f"gap {judge}": "gap all", f"se {judge}": "se all", "n_references": "n all"})
+    wide = by_stance.pivot(index="situation_id", columns="group", values=["mean", "se", "n_references"])
+    for group in [g for g in order if g in set(by_stance["group"])]:
+        for stat, col in (("gap", "mean"), ("se", "se"), ("n", "n_references")):
+            out[f"{stat} {group}"] = out["situation_id"].map(wide[(col, group)])
+    return out
+
+
+def plot_stance_top_situations(table, judge, grouping, contrast, n_top, out_dir, title, relative, baseline, name,
+                               group_means=None):
+    """The first `n_top` situations of `table` (stance_top_table), one point (±1.96 SE) per stance group side by
+    side within each situation's row; the judge's gap over all the situation's items as a grey bar, each group's
+    mean gap over all the situations as a dotted line of its color. "pair": one panel per reference stance, the
+    candidate stances within it."""
+    rows = table.head(n_top)
+    present = [c.removeprefix("gap ") for c in rows.columns if c.startswith("gap ") and c != "gap all"]
+    if grouping == "pair":
+        panels = [(f"reference: {r}", [g for g in present if g.startswith(f"{r} -> ")]) for r in STANCES]
+        panels = [(t, gs) for t, gs in panels if gs]
+    else:
+        panels = [(None, present)]
+    fig, axes = figure(ncols=len(panels), sharey=True, sharex=True,
+                       figsize=(10 if len(panels) == 1 else 15, 1.0 + 0.32 * len(rows) * 2))
+    y0 = np.arange(len(rows))
+    for ax, (panel_title, groups) in zip(axes, panels):
+        setup_axes(ax)
+        ax.grid(axis="y", visible=False)
+        ax.axvline(0, color=INK_MUTED, linewidth=1, zorder=1)
+        ax.barh(y0, rows["gap all"], height=0.8, color=GRID, zorder=1)
+        step = 0.6 / max(1, len(groups) - 1)
+        for k, group in enumerate(groups):
+            color, marker = stance_group_style(group)
+            if group_means and np.isfinite(group_means.get(group, np.nan)):
+                ax.axvline(group_means[group], color=color, linewidth=1, linestyle=":", zorder=1)
+            y = y0 + (k - (len(groups) - 1) / 2) * step
+            ax.errorbar(rows[f"gap {group}"], y, xerr=1.96 * rows[f"se {group}"].fillna(0), fmt="none",
+                        ecolor=color, elinewidth=1.5, capsize=0, zorder=2)
+            label = group.split(" -> ")[1] if grouping == "pair" else group
+            ax.scatter(rows[f"gap {group}"], y, color=color, marker=marker, s=30, edgecolors=SURFACE,
+                       linewidths=1, zorder=3, label=label)
+        if panel_title:
+            ax.set_title(panel_title, fontsize=10, color=INK)
+        if relative:
+            percent_axis(ax.xaxis)
+    tag = (lambda r: f"[{r['expected_level']}] ") if "expected_level" in rows else (lambda r: "")
+    labels = [f"{r['rank']}. {tag(r)}{textwrap.shorten(str(r['situation']), 70)}  (n={r['n all']})"
+              for _, r in rows.iterrows()]
+    axes[0].set_yticks(y0, labels, fontsize=8, color=INK)
+    axes[0].set_ylim(len(rows) - 0.5, -0.5)
+    what = (f"Mean {contrast} score difference in the situation, % of its mean {baseline} score" if relative
+            else f"Mean {contrast} score difference in the situation")
+    fig.supxlabel(f"{what}\n(±1.96 SE over its references in the group; grey bar: all the situation's items; "
+                  f"dotted: the group's mean gap over all the situations; n = references)", fontsize=9, color=INK_2)
+    height = fig.get_figheight()
+    fig.suptitle(title, fontsize=11, color=INK, y=1 - 0.15 / height, va="top")
+    by_label = dict(zip(*reversed(axes[0].get_legend_handles_labels())))
+    for ax in axes[1:]:
+        by_label.update(dict(zip(*reversed(ax.get_legend_handles_labels()))))
+    fig.legend(list(by_label.values()), list(by_label.keys()), loc="upper center", ncol=len(by_label),
+               frameon=False, fontsize=8, labelcolor=INK_2, bbox_to_anchor=(0.5, 1 - 0.4 / height),
+               title="candidate stance" if grouping == "pair" else "stance match", title_fontsize=8)
+    fig.tight_layout(rect=(0, 0, 1, 1 - 1.0 / height))
+    save(fig, out_dir, name, relative)
 
 
 def plot_topics(topics, gaps, judges, grouping, sort_by, min_situations, out_dir, title, relative=False,
-                baseline=NEUTRAL_LEVEL):
+                baseline=NEUTRAL_LEVEL, order=None, name=None, unit="topic"):
     """One panel per signed contrast, one row per topic group (with at least `min_situations` situations),
-    sorted by the `sort_by` gap averaged over the judges; dotted lines: each judge's pooled gap."""
+    sorted by the `sort_by` gap averaged over the judges (or in the given `order`); dotted lines: each
+    judge's pooled gap. Saved as `name` (default topics_{grouping})."""
     pooled = gaps[gaps["prompt_variation"] == "all"]
     contrasts = list(dict.fromkeys(pooled["contrast"]))
     sub = topics[(topics["grouping"] == grouping) & (topics["n_situations"] >= min_situations)]
-    order = (sub[sub["measure"] == sort_by].groupby("topic")["mean"].mean().sort_values(ascending=False).index)
+    contrasts = [c for c in contrasts if c in set(sub["measure"])]
+    if order is None:
+        order = (sub[sub["measure"] == sort_by].groupby("topic")["mean"].mean().sort_values(ascending=False).index)
+    else:
+        order = [g for g in order if g in set(sub["topic"])]
     if not len(order):
         return
     n_sit = sub.groupby("topic")["n_situations"].first()
@@ -606,17 +986,18 @@ def plot_topics(topics, gaps, judges, grouping, sort_by, min_situations, out_dir
     axes[0].set_yticks(np.arange(len(order)),
                        [f"{textwrap.shorten(str(t), 48)}  (n={n_sit[t]})" for t in order], fontsize=8, color=INK)
     axes[0].invert_yaxis()
-    fig.supxlabel(f"{gap_label(relative, baseline)} (95% CI, bootstrap over the topic's situations; "
+    fig.supxlabel(f"{gap_label(relative, baseline)} (95% CI, bootstrap over the {unit}'s situations; "
                   f"dotted: pooled; n = situations)", fontsize=9, color=INK_2)
     height = fig.get_figheight()
     fig.suptitle(title, fontsize=11, color=INK, y=1 - 0.15 / height, va="top")
     legend(fig, judges, judges, y=1 - 0.45 / height)
     fig.tight_layout(rect=(0, 0, 1, 1 - 0.6 / height))
-    save(fig, out_dir, f"topics_{grouping}", relative)
+    save(fig, out_dir, name or f"topics_{grouping}", relative)
 
 
-def load_situation_texts(results_dir):
-    frames = [pd.read_csv(p, usecols=["situation_id", "situation"]) for p in results_dir.glob("*_mean.csv")]
+def load_situation_texts(results_dirs):
+    frames = [pd.read_csv(p, usecols=["situation_id", "situation"])
+              for d in as_dirs(results_dirs) for p in Path(d).glob("*_mean.csv")]
     if not frames:
         return pd.Series(dtype=str)
     return pd.concat(frames).drop_duplicates("situation_id").set_index("situation_id")["situation"]
@@ -626,15 +1007,16 @@ def load_situation_texts(results_dir):
 
 def main():
     args = parse_args()
-    out_dir = args.out_dir or ANALYSIS_DIR / args.results_dir.resolve().name
+    name = run_name(args.results_dirs)
+    out_dir = args.out_dir or default_out_dir(name)
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(args.seed)
 
-    df, variable, sides = load(args.results_dir, args.judges)
+    df, variable, sides = load(args.results_dirs, args.judges)
     judges = judge_order(df["judge"].unique())
     levels = ordered_levels(df["level"].unique(), variable)
     intervened = " & ".join(sides) or "no side"
-    print(f"{args.results_dir}: judges {judges}, variable {variable}, intervened {intervened}, levels "
+    print(f"{name}: judges {judges}, variable {variable}, intervened {intervened}, levels "
           f"{levels + ([NEUTRAL_LEVEL] if NEUTRAL_LEVEL in set(df['level']) else [])}")
 
     variation, gaps, by_situation = [], [], []
@@ -660,7 +1042,7 @@ def main():
     factor_labels = {"prompt": "Prompt variation\n(5 prompts, level fixed)",
                      "levels": f"{variable or 'Level'}: {' vs '.join(levels)}\n(prompt fixed)",
                      "cue": f"{variable or 'Level'} cue vs {NEUTRAL_LEVEL}\n(prompt fixed)"}
-    title = f"{args.results_dir.name}: {intervened} intervened" + (" (relative)" if rel else "")
+    title = f"{name}: {intervened} intervened" + (" (relative)" if rel else "")
     plot_variation(variation, factor_labels, judges, out_dir, f"Score variation by factor — {title}", rel)
     if len(gaps):
         plot_gaps(gaps, judges, out_dir, f"Signed score gaps — {title}", rel, baseline)
@@ -687,35 +1069,54 @@ def main():
     if by_situation:
         by_situation = pd.concat(by_situation, ignore_index=True)
         contrast = f"{levels[0]} - {levels[1]}" if len(levels) >= 2 else gaps["contrast"].iloc[0]
-        top = top_situations(by_situation, load_situation_texts(args.results_dir), judges, contrast)
+        expected = expected_levels(df, variable)
+        top = top_situations(by_situation, load_situation_texts(args.results_dirs), judges, contrast, expected)
         by_situation.to_csv(out_dir / f"situations{suffix}.csv", index=False)
         top.to_csv(out_dir / f"top_situations{suffix}.csv", index=False)
         plot_top_situations(top, judges, contrast, args.top, out_dir,
                             f"Situations with the largest {contrast} gap (mean over judges) — {title}", rel, baseline)
+        texts = load_situation_texts(args.results_dirs)
+        pooled = (gaps[(gaps["contrast"] == contrast) & (gaps["prompt_variation"] == "all")]
+                  .set_index("judge")["mean"].to_dict())
+        top_max = top_situations(by_situation, texts, judges, contrast, expected, rank_by="max")
+        top_max.to_csv(out_dir / f"top_situations_max{suffix}.csv", index=False)
+        plot_top_situations(top_max, judges, contrast, args.top, out_dir,
+                            f"Situations with the largest {contrast} gap (max |gap| over judges) — {title}", rel,
+                            baseline, name="top_situations_max", pooled=pooled)
+        judge_dir = out_dir / "model_specific_top_situations"
+        judge_dir.mkdir(exist_ok=True)
+        for judge in judges:
+            top_judge = top_situations(by_situation, texts, judges, contrast, expected, rank_by=judge)
+            top_judge.to_csv(judge_dir / f"top_situations_{judge}{suffix}.csv", index=False)
+            plot_top_situations(top_judge, judges, contrast, args.top, judge_dir,
+                                f"Situations with the largest {contrast} gap for {judge} — {title}", rel, baseline,
+                                name=f"top_situations_{judge}", plot_judges=[judge], pooled=pooled)
 
         gap_by_judge = (by_situation[by_situation["measure"] == contrast]
                         .pivot(index="situation_id", columns="judge", values="mean").reindex(columns=judges))
         agreement = gap_by_judge.corr(method="spearman")
         agreement.to_csv(out_dir / f"situation_agreement{suffix}.csv")
         print(f"\nPer-situation {contrast} gap: Spearman correlation between judges\n", agreement.round(3))
-        show = ["rank", "gap_mean_over_judges", "n_judges_same_sign"] + [f"gap {j}" for j in judges] + [
-            "n_references", "situation"]
+        show = (["rank", "gap_mean_over_judges", "n_judges_same_sign"] + [f"gap {j}" for j in judges]
+                + ["n_references"] + (["expected_level"] if expected is not None else []) + ["situation"])
         with pd.option_context("display.max_colwidth", 90, "display.float_format", "{:.3f}".format):
             print(f"\nTop {args.top} situations by |{contrast}| (mean over judges)\n",
                   top[show].head(args.top).to_string(index=False))
 
         # Topics: the same measures by topic domain and subdomain (after the rest, so that adding them
         # does not change the bootstrap draws of the pooled results).
-        if all(c in df for c in TOPIC_GROUPINGS.values()):
+        groupings = available_groupings(df)
+        if groupings:
             topics, tests = [], []
             for judge in judges:
-                r, t = analyze_topics(df[df["judge"] == judge], variable, args.n_boot, args.n_perm, rng, rel)
+                r, t = analyze_topics(df[df["judge"] == judge], variable, groupings, args.n_boot, args.n_perm,
+                                      rng, rel)
                 topics += r
                 tests += t
             topics, tests = pd.DataFrame(topics), pd.DataFrame(tests)
             topics.to_csv(out_dir / f"topics{suffix}.csv", index=False)
             tests.to_csv(out_dir / f"topic_heterogeneity{suffix}.csv", index=False)
-            for grouping in TOPIC_GROUPINGS:
+            for grouping in groupings:
                 plot_topics(topics, gaps, judges, grouping, contrast, args.min_situations, out_dir,
                             f"Signed score gaps by topic {grouping} — {title}", rel, baseline)
             print(f"\nDo the topics differ? eta2 of the situation {'percentages' if rel else 'means'} between "
@@ -725,12 +1126,63 @@ def main():
                   .to_string())
             print(f"(eta2 under no topic effect: "
                   f"{', '.join(f'{g} {v:.3f}' for g, v in tests.groupby('grouping')['eta2_null'].first().items())})")
-            domain = topics[(topics["grouping"] == "domain") & (topics["measure"] == contrast)]
-            print(f"\n{contrast} by topic domain (mean [95% CI])\n",
-                  domain.assign(value=domain.apply(fmt, axis=1))
-                  .pivot(index="topic", columns="judge", values="value").to_string())
+            first = next(iter(groupings))
+            for measure in [contrast]:
+                sub = topics[(topics["grouping"] == first) & (topics["measure"] == measure)]
+                print(f"\n{measure} by {first} (mean [95% CI])\n",
+                      sub.assign(value=sub.apply(fmt, axis=1))
+                      .pivot(index="topic", columns="judge", values="value").to_string())
         else:
             print("\nNo topic columns in the scores: run topics.py to add them.")
+
+        # Stances: the same by the stance of the reference, the pair of stances and their match.
+        if all(c in df for c in STANCE_COLUMNS):
+            stances, tests = [], []
+            for judge in judges:
+                r, t = analyze_stances(df[df["judge"] == judge], variable, args.n_boot, args.n_perm, rng, rel)
+                stances += r
+                tests += t
+            stances = pd.DataFrame(stances)
+            stances.to_csv(out_dir / f"stances{suffix}.csv", index=False)
+            for grouping, (_, order) in STANCE_GROUPINGS.items():
+                plot_topics(stances, gaps, judges, grouping, contrast, 0, out_dir,
+                            f"Signed score gaps by stance {grouping} — {title}", rel, baseline,
+                            order=order, name=f"stances_{grouping}", unit="group")
+            if tests:
+                tests = pd.DataFrame(tests)
+                tests.to_csv(out_dir / "stance_heterogeneity.csv", index=False)
+                print("\nDo the stance groups differ? eta2 of the item means between the groups vs its mean under "
+                      "stances shuffled within the situations, permutation p-value\n",
+                      tests.assign(eta2=tests["eta2"].round(3), eta2_null_mean=tests["eta2_null_mean"].round(3))
+                      .pivot(index=["grouping", "measure"], columns="judge",
+                             values=["eta2", "eta2_null_mean", "p_value"]).to_string())
+            for grouping in STANCE_GROUPINGS:
+                for measure in [contrast] + ([CONGRUENT] if CONGRUENT in set(stances["measure"]) else []):
+                    sub = stances[(stances["grouping"] == grouping) & (stances["measure"] == measure)]
+                    print(f"\n{measure} by stance {grouping} (mean [95% CI])\n",
+                          sub.assign(value=sub.apply(fmt, axis=1))
+                          .pivot(index="topic", columns="judge", values="value")
+                          .reindex(STANCE_GROUPINGS[grouping][1]).dropna(how="all").to_string())
+
+            # Each judge's top situations (ranked as in model_specific_top_situations), with the gap of every
+            # stance group (match, pair) of each situation in one plot.
+            by_stance = [stance_situations(df[df["judge"] == judge], variable, rel) for judge in judges]
+            by_stance = pd.concat([s for s in by_stance if s is not None], ignore_index=True)
+            stance_dir = out_dir / "model_specific_top_situations_by_stance"
+            stance_dir.mkdir(exist_ok=True)
+            for judge in judges:
+                ranked = top_situations(by_situation, texts, judges, contrast, expected, rank_by=judge)
+                for grouping in ("match", "pair"):
+                    sub = by_stance[(by_stance["judge"] == judge) & (by_stance["grouping"] == grouping)
+                                    & (by_stance["measure"] == contrast)]
+                    name = f"top_situations_{judge}_by_{grouping}"
+                    table = stance_top_table(ranked, sub, judge, STANCE_GROUPINGS[grouping][1])
+                    table.to_csv(stance_dir / f"{name}{suffix}.csv", index=False)
+                    group_means = (stances[(stances["judge"] == judge) & (stances["grouping"] == grouping)
+                                           & (stances["measure"] == contrast)].set_index("topic")["mean"].to_dict())
+                    plot_stance_top_situations(table, judge, grouping, contrast, args.top, stance_dir,
+                                               f"Situations with the largest {contrast} gap for {judge}, by stance "
+                                               f"{grouping} — {title}", rel, baseline, name, group_means)
     print(f"\nSaved to {out_dir}")
 
 

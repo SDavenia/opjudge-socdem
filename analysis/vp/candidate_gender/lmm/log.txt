@@ -1,0 +1,12 @@
+fitting gemma3
+  dropping zero random terms: situation
+NOTE: Results may be misleading due to involvement in interactions
+fitting llama-3.3-70b
+NOTE: Results may be misleading due to involvement in interactions
+fitting mistral-24b
+NOTE: Results may be misleading due to involvement in interactions
+fitting qwen2.5-72b
+NOTE: Results may be misleading due to involvement in interactions
+Warning message:
+Model failed to converge with 1 negative eigenvalue: -2.3e+02 
+fitting pooled model (all judges)

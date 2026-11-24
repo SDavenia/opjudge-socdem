@@ -194,7 +194,7 @@ not intervened); `*_original_text_id` links a version back to the HBY opinion.
 ## Analysis
 
 ```bash
-python analyze.py scores/reference_gender      # -> analysis/reference_gender/
+python analyze.py scores/reference_gender      # -> analysis/hb/reference_gender/
 ```
 
 For every judge of the directory, how much the score moves when only the prompt variation
@@ -219,6 +219,64 @@ per-situation values), its expected value with no topic effect, (G - 1) / (N - 1
 permutation p-value (`--n_perm`, default 2000). There are 30 such tests per run (3 judges x 2
 groupings x 5 measures), so correct for multiple comparisons before reading single p-values.
 
+Groupings (`topics.csv`, `topic_heterogeneity.csv`, `topics_{grouping}.png`): every one of
+`selection_topic` (`selection`), `expected_authority` (`authority`), `topic_domain`, `topic_subdomain`
+that the scores have with at least 2 values.
+
+Stereotype congruence (`congruent - incongruent` in `signed_gaps*.csv`, gender only): the score of the
+level the stereotype expects in the situation (`expected_authority`: M -> male, W -> female) minus the
+other one, averaged with the M and W situations weighted equally (bootstrap stratified by
+`expected_authority`). A gap shared by all situations (e.g. female > male everywhere) then cancels:
+it equals ((female - male | W) - (female - male | M)) / 2. Positive = the judge favours the
+stereotype-expected gender. Not in the topic tables (within a group it is just +-(female - male)).
+
+```bash
+python analyze.py scores/hb_reference_gender --out_dir analysis/hb/reference_gender
+python analyze.py scores/hb_reference_gender --out_dir analysis/hb/reference_gender --relative
+python analyze.py scores/hb_candidate_gender --out_dir analysis/hb/candidate_gender
+python analyze.py scores/hb_candidate_gender --out_dir analysis/hb/candidate_gender --relative
+```
+
+Double intervention (`both`): `analyze_both.py` analyses the 3 x 3 cells of reference x candidate level
+(baseline N|N = "As a person" on both sides): main effects, interactions, gender matching net of the
+lexical overlap of identical phrases (`match excess` = (same - cross) - (N|N - mixed)), F|F vs M|M,
+the candidate female - male gap by reference level, stereotype congruence, the same stance and topic
+breakdowns, decision flips (does a cue make a lower-ranked candidate overtake?) and the replication of
+the single-side effects. See its docstring.
+
+```bash
+python analyze_both.py scores/hb_both_gender --out_dir analysis/hb/both_gender
+python analyze_both.py scores/hb_both_gender --out_dir analysis/hb/both_gender --relative
+```
+
+VP and joint (HB + VP pooled) analyses: the same scripts. Several score directories are concatenated (the
+situation ids differ between datasets). The topic groupings that only one dataset has (`topic_domain`,
+`topic_subdomain`: topics.py was run on HB only) are dropped, and a `dataset` grouping (hb vs vp) is added.
+The lmm scripts take comma-separated directories.
+
+Outputs are laid out as `analysis/<dataset>/<setup>/`, with `<dataset>` = `hb`, `vp` or `joint`
+(the default `--out_dir` follows it: `scores/vp_reference_gender` -> `analysis/vp/reference_gender`,
+`scores/hb_* scores/vp_*` -> `analysis/joint/*`). `run_analysis.sh` runs everything (single-side,
+both, absolute and relative, and the candidate LMM in `candidate_gender/lmm/`) for the given datasets:
+
+```bash
+./run_analysis.sh               # hb vp joint
+./run_analysis.sh vp            # analysis/vp/{reference,candidate,both}_gender
+```
+
+Write-ups of the results: `docs/reference_gender.md`, `docs/candidate_gender.md`, `docs/both_gender.md`.
+
+By stance (`stances*.csv`, `stances_{reference,pair,match}*.png`): every signed gap (with the congruence
+contrast) and unsigned mad by the reference's stance group (agree / neutral / disagree), by the pair
+reference -> candidate (9 cells) and by their match (`same`, `opposite`, `partial` = one side neutral),
+95% CIs by bootstrap over situations. Stances vary within a situation, so `stance_heterogeneity.csv`
+(absolute mode only) tests the groups on the item means (reference x candidate) against stances
+shuffled within each situation (references among references, candidates among candidates), which keeps
+the situation effects and the M/W composition. The baselines differ a lot by pair (neutral mean 0.21
+for disagree -> agree, 0.84 for disagree -> disagree): read the relative version too.
+
+The outputs of the earlier HBY run (`scores/reference_gender`) are in `analysis/old/reference_gender/`.
+
 `--relative` writes the same tables and plots with a `_relative` suffix, as percentage changes per
 situation: for each situation, its mean difference over its mean baseline score (mean female 0.15
 vs mean neutral 0.10 is +50%), then the unweighted mean of those percentages over the situations
@@ -228,3 +286,25 @@ differences to the mean of the compared scores. Per-pair ratios are not used, si
 0. A situation with a low baseline gets a large percentage (e.g. Llama's neutral mean is 0.04 in one
 situation) and weighs as much as any other in the mean, so read the relative results together with
 the baselines.
+
+### Linear mixed models (R)
+
+`lmm/` fits LMMs (lme4 + lmerTest, emmeans) on the per-prompt scores, to see which factors move the
+score most and to test the gender effects with the right error terms. So far: the candidate
+intervention (`lmm/candidate.R`; `lmm/common.R` holds the loading and helpers for the other setups).
+
+```bash
+Rscript lmm/candidate.R scores/hb_candidate_gender analysis/hb/candidate_gender/lmm   # ~3 min per-judge + pooled
+Rscript lmm/candidate.R ... --no_pooled          # per-judge models only
+Rscript lmm/candidate.R ... --exclude_mismatch   # without HB_173962115 (stance labels off-question)
+```
+
+Per judge: `score ~ level * match + level * prompt + level * authority + match * prompt` with random
+intercepts for situation, reference, candidate, base pair (reference x candidate opinion, whose cue levels
+are minimal pairs), base_pair:prompt, situation:level and base_pair:level. The last two are the error terms
+of the gender effects. Random terms estimated at 0 are dropped and the model refitted. Sum-to-zero coding.
+The pooled model crosses the fixed effects with `judge` (adding judge-nested random terms) to test whether
+judges differ. Outputs: `variance_partition.csv` (share of the score variance per fixed term and random
+component), `anova.csv` (type III F, Satterthwaite df), `contrasts.csv` (female/male - neutral and female -
+male, pooled and by match / prompt / authority, plus the congruence contrast ((f - m | W) - (f - m | M)) / 2;
+pooled with the observed cell weights, as `analyze.py`), `random_effects.csv`, `summary.txt`, `models.rds`.
